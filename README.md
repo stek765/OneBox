@@ -29,6 +29,19 @@ still gets through.
 
 <br>
 
+## Where it lives
+
+Onebox sits in the **menu bar, top right**, as a small cube. Click it and the
+panel drops right under the icon, with the arrow pointing at the cube. Click
+outside (or the icon again) and it goes away. There is no Dock icon and no window
+to find.
+
+<p align="center"><img src="docs/menubar.gif" alt="The cube builds up in the menu bar at launch, then a click opens the panel under it and it closes again" width="720"></p>
+
+If the icon is not there, an icon manager has probably hidden it, see [Install](#install).
+
+<br>
+
 ## The panel
 
 <p align="center"><img src="docs/panel.gif" alt="The panel under the menu bar icon cycling through its tabs: WhatsApp, Telegram, Slack, Discord, Proton Mail and LinkedIn" width="640"></p>
