@@ -67,7 +67,7 @@ page.
 
 | Group | What you can change |
 |---|---|
-| **Look** | Theme (system / light / dark), panel width (or drag the edge), page zoom, icon style, animation, unread count |
+| **Look** | Theme (light by default, or system / dark), panel width (or drag the edge), page zoom, icon style, animation, unread count |
 | **Notifications** | Global switch, **quiet hours** (`22:00 → 08:00`, crossing midnight works) |
 | **Services** | Per service: visible, notifications on/off |
 | **General** | Language (English / Italiano), launch at login, clear media cache on quit, close on click outside, global shortcut |

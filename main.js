@@ -49,7 +49,7 @@ const VALID = {
   shortcut: (v) => SHORTCUTS.includes(v),
   lang: (v) => v in STR,
 };
-const SET_DEFAULTS = { theme: 'system', notifications: true, quiet: { on: false, from: '22:00', to: '08:00' }, muted: [], hidden: ['gmail'], icon: 'cubo', launchAtLogin: false, closeOnBlur: true, showCount: true, lang: 'en', shortcut: '', zoom: 0.8, width: 820, clearCacheOnQuit: true, animate: true };
+const SET_DEFAULTS = { theme: 'light', notifications: true, quiet: { on: false, from: '22:00', to: '08:00' }, muted: [], hidden: ['gmail'], icon: 'cubo', launchAtLogin: false, closeOnBlur: true, showCount: true, lang: 'en', shortcut: '', zoom: 0.8, width: 820, clearCacheOnQuit: true, animate: true };
 let S = SET_DEFAULTS;
 const T = () => STR[S.lang];
 const setFile = () => path.join(app.getPath('userData'), 'settings.json');
