@@ -29,13 +29,12 @@
 <div id="app"></div>
 <script>
   const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
-  const SHORT = [['', 'Nessuna'], ['Alt+Cmd+O', '⌥⌘O'], ['Ctrl+Alt+Space', '⌃⌥Spazio']];
-  const WIDTHS = [[560, 'Stretto'], [820, 'Medio'], [1040, 'Largo']];
   const ZOOMS = [[1, '100%'], [0.9, '90%'], [0.8, '80%'], [0.7, '70%'], [0.6, '60%']];
-  const THEMES = [['system', 'Sistema'], ['light', 'Chiaro'], ['dark', 'Scuro']];
-  let S, SV, ICONS, VERSION;
+  const LANGS = [['en', 'English'], ['it', 'Italiano']];
+  let S, SV, ICONS, VERSION, t;
+  const apply = (p) => ({ settings: S, services: SV, icons: ICONS, version: VERSION, t } = p);
 
-  const set = async (patch) => { S = await settings.set(patch); render(); };
+  const set = async (patch) => { apply(await settings.set(patch)); render(); };
   const opts = (list, cur, key) => { const d = el('div', 'opts'); for (const [v, label] of list) { const b = el('button', v === cur ? 'on' : '', label); b.onclick = () => set({ [key]: v }); d.append(b); } return d; };
   const sw = (on, fn) => { const b = el('button', `sw${on ? ' on' : ''}`); b.onclick = fn; return b; };
   const row = (label, ctrl, hint) => { const r = el('div', 'row'); const l = el('div'); l.append(el('span', '', label)); if (hint) l.append(el('small', '', hint)); r.append(l, ctrl); return r; };
@@ -45,8 +44,8 @@
     const hidden = S.hidden.includes(s.id), muted = S.muted.includes(s.id);
     const d = el('div', 'opts'); d.style.gap = '16px';
     d.append(
-      toggle('Visibile', !hidden, () => set({ hidden: hidden ? S.hidden.filter((x) => x !== s.id) : [...S.hidden, s.id] })),
-      toggle('Notifiche', !muted, () => set({ muted: muted ? S.muted.filter((x) => x !== s.id) : [...S.muted, s.id] })),
+      toggle(t.visible, !hidden, () => set({ hidden: hidden ? S.hidden.filter((x) => x !== s.id) : [...S.hidden, s.id] })),
+      toggle(t.notifications, !muted, () => set({ muted: muted ? S.muted.filter((x) => x !== s.id) : [...S.muted, s.id] })),
     );
     return d;
   };
@@ -54,9 +53,9 @@
   function header() {
     const h = el('header');
     const logo = el('img'); logo.src = 'assets/logo.png'; logo.alt = '';
-    const t = el('div'); t.append(el('div', 'name', 'Onebox'), el('small', '', `Tutti i messaggi, un solo posto · v${VERSION}`));
-    const q = el('button', 'quit', '⏻ Esci'); q.title = 'Esci da Onebox'; q.onclick = () => settings.quit();
-    h.append(logo, t, q);
+    const title = el('div'); title.append(el('div', 'name', 'Onebox'), el('small', '', `${t.tagline} · v${VERSION}`));
+    const q = el('button', 'quit', `⏻ ${t.quit}`); q.title = t.quitTitle; q.onclick = () => settings.quit();
+    h.append(logo, title, q);
     return h;
   }
 
@@ -72,30 +71,34 @@
     const quietCtl = el('div', 'opts'); quietCtl.style.alignItems = 'center';
     quietCtl.append(time('from'), el('span', '', '→'), time('to'), sw(S.quiet.on, () => set({ quiet: { ...S.quiet, on: !S.quiet.on } })));
 
+    const SHORT = [['', t.none], ['Alt+Cmd+O', '⌥⌘O'], ['Ctrl+Alt+Space', t.space]];
+    const WIDTHS = [[560, t.narrow], [820, t.medium], [1040, t.wide]];
+    const THEMES = [['system', t.system], ['light', t.light], ['dark', t.dark]];
     document.getElementById('app').replaceChildren(
       header(),
-      el('h3', '', 'Aspetto'),
-      row('Tema', opts(THEMES, S.theme, 'theme')),
-      row('Larghezza del pannello', opts(WIDTHS, S.width, 'width'), 'Puoi anche trascinare il bordo del pannello'),
-      row('Zoom delle pagine', opts(ZOOMS, S.zoom, 'zoom'), 'Più basso = ci sta più contenuto (utile per WhatsApp)'),
-      row('Icona nella barra dei menu', icons),
-      row('Animazione dell’icona', sw(S.animate, () => set({ animate: !S.animate })), 'Solo con l’icona Cubo: si accende all’avvio e a ogni messaggio che passa i filtri'),
-      row('Numero dei non letti accanto all’icona', sw(S.showCount, () => set({ showCount: !S.showCount }))),
-      el('h3', '', 'Notifiche'),
-      row('Notifiche attive', sw(S.notifications, () => set({ notifications: !S.notifications }))),
-      row('Silenzio programmato', quietCtl, 'Le notifiche non compaiono in questa fascia oraria'),
-      el('h3', '', 'Servizi'),
-      el('small', '', 'Visibile: la scheda compare nella barra (tasto destro su una scheda per nasconderla). Notifiche: spento = niente notifiche, suoni né conteggio.'),
+      el('h3', '', t.secLook),
+      row(t.theme, opts(THEMES, S.theme, 'theme')),
+      row(t.width, opts(WIDTHS, S.width, 'width'), t.widthHint),
+      row(t.zoom, opts(ZOOMS, S.zoom, 'zoom'), t.zoomHint),
+      row(t.icon, icons),
+      row(t.animate, sw(S.animate, () => set({ animate: !S.animate })), t.animateHint),
+      row(t.count, sw(S.showCount, () => set({ showCount: !S.showCount }))),
+      el('h3', '', t.secNotif),
+      row(t.notif, sw(S.notifications, () => set({ notifications: !S.notifications }))),
+      row(t.quiet, quietCtl, t.quietHint),
+      el('h3', '', t.secServices),
+      el('small', '', t.servicesHint),
       ...SV.map((s) => row(s.name, serviceCtl(s))),
-      el('h3', '', 'Generale'),
-      row('Avvia Onebox al login', sw(S.launchAtLogin, () => set({ launchAtLogin: !S.launchAtLogin }))),
-      row('Svuota la cache dei media quando esci', sw(S.clearCacheOnQuit, () => set({ clearCacheOnQuit: !S.clearCacheOnQuit })), 'Foto e file visti non restano sul disco. Resti collegato'),
-      row('Chiudi il pannello cliccando fuori', sw(S.closeOnBlur, () => set({ closeOnBlur: !S.closeOnBlur }))),
-      row('Scorciatoia per aprire/chiudere', opts(SHORT, S.shortcut, 'shortcut'), 'Utile se l’icona è nascosta da Ice'),
+      el('h3', '', t.secGeneral),
+      row(t.language, opts(LANGS, S.lang, 'lang')),
+      row(t.login, sw(S.launchAtLogin, () => set({ launchAtLogin: !S.launchAtLogin }))),
+      row(t.clearCache, sw(S.clearCacheOnQuit, () => set({ clearCacheOnQuit: !S.clearCacheOnQuit })), t.clearCacheHint),
+      row(t.blur, sw(S.closeOnBlur, () => set({ closeOnBlur: !S.closeOnBlur }))),
+      row(t.shortcut, opts(SHORT, S.shortcut, 'shortcut'), t.shortcutHint),
     );
   }
 
-  async function load() { ({ settings: S, services: SV, icons: ICONS, version: VERSION } = await settings.get()); render(); }
+  async function load() { apply(await settings.get()); render(); }
   settings.onOpen(load);
   load();
 </script>

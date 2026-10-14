@@ -16,7 +16,7 @@
 <svg id="arrow" viewBox="0 0 22 10"><path d="M0 10 L9 2 Q11 0 13 2 L22 10 Z"/></svg>
 <div id="shape"></div>
 <script>
-  tabs.onState(({ list, current, settingsOpen, arrowX }) => {
+  tabs.onState(({ list, current, settingsOpen, arrowX, gearTitle }) => {
     const arrow = document.getElementById('arrow');
     arrow.style.display = arrowX == null ? 'none' : 'block';
     if (arrowX != null) arrow.style.left = `${arrowX - 11}px`;
@@ -31,7 +31,7 @@
     }), (() => {
       const g = document.createElement('button');
       g.className = `gear${settingsOpen ? ' on' : ''}`;
-      g.title = 'Impostazioni';
+      g.title = gearTitle;
       g.textContent = '⚙︎';
       g.onclick = () => tabs.gear();
       return g;

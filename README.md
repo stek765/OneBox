@@ -70,7 +70,7 @@ page.
 | **Look** | Theme (system / light / dark), panel width (or drag the edge), page zoom, icon style, animation, unread count |
 | **Notifications** | Global switch, **quiet hours** (`22:00 → 08:00`, crossing midnight works) |
 | **Services** | Per service: visible, notifications on/off |
-| **General** | Launch at login, clear media cache on quit, close on click outside, global shortcut |
+| **General** | Language (English / Italiano), launch at login, clear media cache on quit, close on click outside, global shortcut |
 
 <br>
 
@@ -148,7 +148,7 @@ If the icon disappears, an icon manager (Ice, Bartender) has put it among the
 hidden ones: drag it out with `Cmd`. The panel then opens at the top right, and a
 global shortcut can be set in the settings.
 
-> The interface is in Italian. Strings live in `settings.html` and `tabs.html`.
+> The interface is in English by default. Italian is one switch away in Settings › General (saved between sessions). Strings live in [`i18n.js`](i18n.js).
 
 <br>
 
@@ -170,6 +170,7 @@ preload.js       notification interception, WhatsApp single-column CSS
 filter.js        allow / deny regexes and quiet hours (+ self-check)
 tabs.html        tab bar with the arrow
 settings.html    settings page
+i18n.js          English and Italian UI strings
 build.sh         builds ~/Applications/Onebox.app
 tools/           logo and menu bar icon generators (Python + numpy)
 assets/          logo and icon frames

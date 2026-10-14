@@ -2,6 +2,7 @@ const { app, BrowserWindow, WebContentsView, Notification, Tray, ipcMain, shell,
 const fs = require('fs');
 const path = require('path');
 const { passes, inQuiet } = require('./filter');
+const STR = require('./i18n');
 
 // Default services, copied to services.json on first run. allow/deny are case-insensitive regexes tested on "title\nbody".
 const DEFAULTS = [
@@ -12,7 +13,7 @@ const DEFAULTS = [
   { id: 'proton', name: 'Proton', url: 'https://mail.proton.me', allow: [], deny: [] },
   { id: 'linkedin', name: 'LinkedIn', url: 'https://www.linkedin.com/messaging/', allow: [], deny: [] },
   // hidden by default (see SET_DEFAULTS): Google blocks sign-in in embedded browsers
-  { id: 'gmail', name: 'Gmail (non funziona: servirebbe IMAP)', url: 'https://mail.google.com', allow: [], deny: [] },
+  { id: 'gmail', name: 'Gmail (not working: needs IMAP)', url: 'https://mail.google.com', allow: [], deny: [] },
 ];
 
 const BAR = 44; // tab strip height
@@ -46,9 +47,11 @@ const VALID = {
   zoom: (v) => typeof v === 'number' && v >= 0.5 && v <= 1,
   width: (v) => Number.isInteger(v) && v >= 420 && v <= 1400,
   shortcut: (v) => SHORTCUTS.includes(v),
+  lang: (v) => v in STR,
 };
-const SET_DEFAULTS = { theme: 'system', notifications: true, quiet: { on: false, from: '22:00', to: '08:00' }, muted: [], hidden: ['gmail'], icon: 'cubo', launchAtLogin: false, closeOnBlur: true, showCount: true, shortcut: '', zoom: 0.8, width: 820, clearCacheOnQuit: true, animate: true };
+const SET_DEFAULTS = { theme: 'system', notifications: true, quiet: { on: false, from: '22:00', to: '08:00' }, muted: [], hidden: ['gmail'], icon: 'cubo', launchAtLogin: false, closeOnBlur: true, showCount: true, lang: 'en', shortcut: '', zoom: 0.8, width: 820, clearCacheOnQuit: true, animate: true };
 let S = SET_DEFAULTS;
+const T = () => STR[S.lang];
 const setFile = () => path.join(app.getPath('userData'), 'settings.json');
 const fromFile = (e) => e.senderFrame.url.startsWith('file:');
 
@@ -60,6 +63,7 @@ function loadSettings() {
 
 function applySettings() {
   nativeTheme.themeSource = S.theme;
+  buildAppMenu();
   if (!animating) tray.setImage(trayImage(S.icon));
   // only on change: macOS logs an error even for a repeated "no"
   if (app.getLoginItemSettings().openAtLogin !== S.launchAtLogin) app.setLoginItemSettings({ openAtLogin: S.launchAtLogin });
@@ -113,6 +117,18 @@ function updateSettings(patch) {
   applySettings();
 }
 
+function buildAppMenu() {
+  Menu.setApplicationMenu(Menu.buildFromTemplate([
+    { role: 'appMenu' },
+    { role: 'editMenu' },
+    { label: T().menuServices, submenu: [
+      ...services.map((s, i) => ({ label: s.name, accelerator: `Cmd+${i + 1}`, click: () => select(s.id) })),
+      { type: 'separator' },
+      { label: T().editServices, click: () => shell.openPath(servicesFile) },
+    ] },
+  ]));
+}
+
 const togglePanel = () => (win.isVisible() ? win.hide() : showPanel());
 
 function toggleSettings() {
@@ -130,7 +146,7 @@ function loadServices() {
     services.push(...JSON.parse(fs.readFileSync(file, 'utf8')));
   } catch (e) {
     services.push(...DEFAULTS); // broken file (hand-edited): start anyway and warn
-    new Notification({ title: 'Onebox', body: `services.json non valido (${e.message.slice(0, 80)}). Uso i servizi di default.` }).show();
+    new Notification({ title: 'Onebox', body: T().badServices.replace('{0}', e.message.slice(0, 80)) }).show();
   }
 }
 
@@ -141,7 +157,7 @@ function pushState() {
   if (win?.isVisible() && arrowX != null) arrowX = arrowFor(tray.getBounds(), win.getPosition()[0]); // the count changes the item width
   // a muted service counts neither on its tab nor next to the icon
   const list = visible().map((s) => ({ id: s.id, name: s.name, unread: S.muted.includes(s.id) ? 0 : unread[s.id] || 0 }));
-  bar.webContents.send('state', { current, settingsOpen, arrowX, list });
+  bar.webContents.send('state', { current, settingsOpen, arrowX, list, gearTitle: T().settings });
   const total = list.reduce((a, s) => a + s.unread, 0);
   tray.setTitle(S.showCount && total ? ` ${total}` : '');
 }
@@ -217,17 +233,18 @@ ipcMain.on('tab-menu', (e, id) => {
   if (e.sender !== bar.webContents || !views[id]) return;
   const muted = S.muted.includes(id);
   Menu.buildFromTemplate([
-    { label: 'Nascondi scheda', enabled: visible().length > 1, click: () => updateSettings({ hidden: [...S.hidden, id] }) },
-    { label: muted ? 'Riattiva notifiche e conteggio' : 'Silenzia notifiche e conteggio', click: () => updateSettings({ muted: muted ? S.muted.filter((x) => x !== id) : [...S.muted, id] }) },
+    { label: T().hideTab, enabled: visible().length > 1, click: () => updateSettings({ hidden: [...S.hidden, id] }) },
+    { label: muted ? T().unmute : T().mute, click: () => updateSettings({ muted: muted ? S.muted.filter((x) => x !== id) : [...S.muted, id] }) },
     { type: 'separator' },
-    { label: 'Ricarica', click: () => views[id].webContents.reload() },
+    { label: T().reload, click: () => views[id].webContents.reload() },
   ]).popup({ window: win });
 });
-ipcMain.handle('settings:get', (e) => (fromFile(e) ? { settings: S, services: services.map(({ id, name }) => ({ id, name })), icons: ICONS, version: app.getVersion() } : null));
+const settingsPayload = () => ({ settings: S, t: T(), services: services.map(({ id, name }) => ({ id, name })), icons: ICONS, version: app.getVersion() });
+ipcMain.handle('settings:get', (e) => (fromFile(e) ? settingsPayload() : null));
 ipcMain.handle('settings:set', (e, patch) => {
-  if (!fromFile(e)) return S;
+  if (!fromFile(e)) return null;
   updateSettings(patch);
-  return S;
+  return settingsPayload();
 });
 ipcMain.on('settings:quit', (e) => fromFile(e) && app.quit());
 
@@ -265,10 +282,10 @@ app.whenReady().then(() => {
   tray.setToolTip('Onebox');
   tray.on('click', togglePanel);
   tray.on('right-click', () => tray.popUpContextMenu(Menu.buildFromTemplate([
-    { label: 'Impostazioni…', click: () => { showPanel(); if (!settingsOpen) toggleSettings(); } },
-    { label: 'Modifica servizi… (poi riavvia)', click: () => shell.openPath(servicesFile) },
+    { label: T().openSettings, click: () => { showPanel(); if (!settingsOpen) toggleSettings(); } },
+    { label: T().editServices, click: () => shell.openPath(servicesFile) },
     { type: 'separator' },
-    { label: 'Esci da Onebox', click: () => app.quit() },
+    { label: T().quitMenu, click: () => app.quit() },
   ])));
 
   win = new BrowserWindow({ width: S.width, height: 780, show: false, frame: false, resizable: true, fullscreenable: false, skipTaskbar: true, alwaysOnTop: true, transparent: true, backgroundColor: '#00000000', hasShadow: true });
@@ -290,14 +307,4 @@ app.whenReady().then(() => {
   playTray(START_FRAMES, 140); // build-up animation at launch
   bar.webContents.once('did-finish-load', () => { select(visible()[0].id); showPanel(); if (process.argv.includes('--settings')) toggleSettings(); });
   app.on('will-quit', () => globalShortcut.unregisterAll());
-
-  Menu.setApplicationMenu(Menu.buildFromTemplate([
-    { role: 'appMenu' },
-    { role: 'editMenu' },
-    { label: 'Servizi', submenu: [
-      ...services.map((s, i) => ({ label: s.name, accelerator: `Cmd+${i + 1}`, click: () => select(s.id) })),
-      { type: 'separator' },
-      { label: 'Modifica servizi… (poi riavvia)', click: () => shell.openPath(servicesFile) },
-    ] },
-  ]));
 });
