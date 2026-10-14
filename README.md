@@ -5,7 +5,7 @@
 # Onebox
 
 **All your messages in one place, and only the notifications you care about.**
-A macOS menu bar app: WhatsApp, Telegram, Slack and Discord in a single panel under the icon. Any other web app (Proton Mail, LinkedIn…) is one line in a JSON file.
+A macOS menu bar app: WhatsApp, Telegram, Slack, Discord, Proton Mail and LinkedIn in a single panel under the icon. Any other web app is one line in a JSON file.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Electron](https://img.shields.io/badge/Electron-43-47848F.svg?logo=electron&logoColor=white)](https://www.electronjs.org/)
@@ -155,7 +155,8 @@ global shortcut can be set in the settings.
 ## Limits
 
 - It only works while the app is running. Pushes to a tab that was never loaded are not intercepted.
-- Gmail web cannot sign in (see above). The way around it is IMAP with an app password, or OAuth in the system browser. Not built here.
+- **Gmail** is in the list but hidden: enable it in Settings › Services. It does not work (Google blocks the sign-in, see above). The way around it is IMAP with an app password, or OAuth in the system browser. Not built yet.
+- LinkedIn is view-only: no automation of any kind.
 - The app is signed **ad-hoc**: there is no verified identity behind it. Build it yourself and read the ~300 lines of `main.js`.
 - Onebox saves no files by itself and clears the media cache on quit. Chats and logins stay.
 

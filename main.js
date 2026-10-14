@@ -9,6 +9,10 @@ const DEFAULTS = [
   { id: 'telegram', name: 'Telegram', url: 'https://web.telegram.org/a/', allow: [], deny: [] },
   { id: 'slack', name: 'Slack', url: 'https://app.slack.com/client', allow: [], deny: [] },
   { id: 'discord', name: 'Discord', url: 'https://discord.com/app', allow: [], deny: [] },
+  { id: 'proton', name: 'Proton', url: 'https://mail.proton.me', allow: [], deny: [] },
+  { id: 'linkedin', name: 'LinkedIn', url: 'https://www.linkedin.com/messaging/', allow: [], deny: [] },
+  // hidden by default (see SET_DEFAULTS): Google blocks sign-in in embedded browsers
+  { id: 'gmail', name: 'Gmail (non funziona: servirebbe IMAP)', url: 'https://mail.google.com', allow: [], deny: [] },
 ];
 
 const BAR = 44; // tab strip height
@@ -43,7 +47,7 @@ const VALID = {
   width: (v) => Number.isInteger(v) && v >= 420 && v <= 1400,
   shortcut: (v) => SHORTCUTS.includes(v),
 };
-const SET_DEFAULTS = { theme: 'system', notifications: true, quiet: { on: false, from: '22:00', to: '08:00' }, muted: [], hidden: [], icon: 'cubo', launchAtLogin: false, closeOnBlur: true, showCount: true, shortcut: '', zoom: 0.8, width: 820, clearCacheOnQuit: true, animate: true, waSingle: true };
+const SET_DEFAULTS = { theme: 'system', notifications: true, quiet: { on: false, from: '22:00', to: '08:00' }, muted: [], hidden: ['gmail'], icon: 'cubo', launchAtLogin: false, closeOnBlur: true, showCount: true, shortcut: '', zoom: 0.8, width: 820, clearCacheOnQuit: true, animate: true, waSingle: true };
 let S = SET_DEFAULTS;
 const setFile = () => path.join(app.getPath('userData'), 'settings.json');
 const fromFile = (e) => e.senderFrame.url.startsWith('file:');
