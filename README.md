@@ -160,6 +160,15 @@ open it and drag **Onebox** into Applications.
 The release is built for Apple Silicon (M1 and later). On an Intel Mac, build it yourself.
 If you would rather not trust a binary, build it from the source: it is about 300 lines of `main.js`.
 
+### Homebrew
+
+```bash
+brew install --cask stek765/tap/onebox
+```
+
+The cask lives in [stek765/homebrew-tap](https://github.com/stek765/homebrew-tap) and installs the same
+`.dmg`. The first-launch warning above may appear here too.
+
 ### Build from source
 
 Needs macOS and Node.js. Python 3 only if you want to regenerate the icons.
