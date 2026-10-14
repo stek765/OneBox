@@ -1,0 +1,40 @@
+<!doctype html>
+<meta charset="utf-8">
+<style>
+  :root { color-scheme: light dark; --bar: #f2f3f8; --text: #1d1f2b; --soft: rgba(60, 70, 120, .12); }
+  @media (prefers-color-scheme: dark) { :root { --bar: #191b2a; --text: #e8ebf7; --soft: rgba(160, 175, 235, .16); } }
+  html, body { margin: 0; height: 100%; background: transparent; }
+  body { position: relative; font: 13px -apple-system, sans-serif; color: var(--text); user-select: none; }
+  #arrow { position: absolute; top: 0; width: 22px; height: 10px; display: none; }
+  #arrow path { fill: var(--bar); }
+  #shape { position: absolute; top: 10px; left: 0; right: 0; height: 56px; box-sizing: border-box; padding: 6px 8px 18px; display: flex; align-items: center; gap: 6px; background: var(--bar); border-radius: 12px 12px 0 0; -webkit-app-region: drag; }
+  button { -webkit-app-region: no-drag; border: 0; border-radius: 8px; padding: 6px 12px; background: transparent; color: inherit; font: inherit; cursor: pointer; }
+  button:hover, button.on { background: var(--soft); }
+  .gear { margin-left: auto; font-size: 26px; line-height: 1; padding: 3px 10px 5px; }
+  b { background: #e5484d; color: #fff; border-radius: 9px; padding: 1px 6px; margin-left: 6px; font-size: 11px; }
+</style>
+<svg id="arrow" viewBox="0 0 22 10"><path d="M0 10 L9 2 Q11 0 13 2 L22 10 Z"/></svg>
+<div id="shape"></div>
+<script>
+  tabs.onState(({ list, current, settingsOpen, arrowX }) => {
+    const arrow = document.getElementById('arrow');
+    arrow.style.display = arrowX == null ? 'none' : 'block';
+    if (arrowX != null) arrow.style.left = `${arrowX - 11}px`;
+    document.getElementById('shape').replaceChildren(...list.map((s) => {
+      const b = document.createElement('button');
+      b.textContent = s.name;
+      if (s.id === current && !settingsOpen) b.className = 'on';
+      if (s.unread) { const n = document.createElement('b'); n.textContent = s.unread > 99 ? '99+' : s.unread; b.append(n); }
+      b.onclick = () => tabs.select(s.id);
+      b.oncontextmenu = (e) => { e.preventDefault(); tabs.menu(s.id); };
+      return b;
+    }), (() => {
+      const g = document.createElement('button');
+      g.className = `gear${settingsOpen ? ' on' : ''}`;
+      g.title = 'Impostazioni';
+      g.textContent = '⚙︎';
+      g.onclick = () => tabs.gear();
+      return g;
+    })());
+  });
+</script>
