@@ -1,0 +1,102 @@
+<!doctype html>
+<meta charset="utf-8">
+<style>
+  :root { color-scheme: light dark; --bg: #fff; --text: #1d1f2b; --line: rgba(60, 70, 120, .16); --soft: rgba(60, 70, 120, .1); --accent: #4f7cff; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #1f2233; --text: #e8ebf7; --line: rgba(160, 175, 235, .18); --soft: rgba(160, 175, 235, .14); } }
+  body { font: 13px -apple-system, sans-serif; margin: 0; padding: 18px 28px 32px; overflow-y: auto; height: 100vh; box-sizing: border-box; background: var(--bg); color: var(--text); }
+  header { display: flex; align-items: center; gap: 14px; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
+  header img { width: 46px; height: 46px; }
+  header .name { font-size: 20px; font-weight: 700; letter-spacing: -.01em; }
+  header small { display: block; opacity: .6; margin-top: 1px; }
+  header .quit { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+  header .quit:hover { color: #ff6369; border-color: #ff6369; }
+  h3 { margin: 24px 0 6px; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; opacity: .55; }
+  .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--line); }
+  .opts { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
+  button { font: inherit; color: inherit; border: 1px solid var(--line); background: transparent; border-radius: 7px; padding: 4px 10px; cursor: pointer; }
+  button:hover { background: var(--soft); }
+  button.on { background: var(--accent); border-color: transparent; color: #fff; }
+  .sw { width: 38px; height: 22px; border-radius: 11px; padding: 0; position: relative; background: var(--soft); border: 0; }
+  .sw::after { content: ''; position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: left .12s; }
+  .sw.on { background: #30a46c; } .sw.on::after { left: 18px; }
+  .ico { width: 40px; height: 32px; padding: 0; display: grid; place-items: center; }
+  .ico img { width: 18px; height: 18px; }
+  @media (prefers-color-scheme: dark) { .ico img { filter: invert(1); } }
+  .ico.on img { filter: invert(1); }
+  input[type=time] { font: inherit; color: inherit; background: transparent; border: 1px solid var(--line); border-radius: 7px; padding: 3px 6px; }
+  small { opacity: .6; display: block; margin-top: 2px; }
+</style>
+<div id="app"></div>
+<script>
+  const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
+  const SHORT = [['', 'Nessuna'], ['Alt+Cmd+O', '⌥⌘O'], ['Ctrl+Alt+Space', '⌃⌥Spazio']];
+  const WIDTHS = [[560, 'Stretto'], [820, 'Medio'], [1040, 'Largo']];
+  const ZOOMS = [[1, '100%'], [0.9, '90%'], [0.8, '80%'], [0.7, '70%'], [0.6, '60%']];
+  const THEMES = [['system', 'Sistema'], ['light', 'Chiaro'], ['dark', 'Scuro']];
+  let S, SV, ICONS, VERSION;
+
+  const set = async (patch) => { S = await settings.set(patch); render(); };
+  const opts = (list, cur, key) => { const d = el('div', 'opts'); for (const [v, label] of list) { const b = el('button', v === cur ? 'on' : '', label); b.onclick = () => set({ [key]: v }); d.append(b); } return d; };
+  const sw = (on, fn) => { const b = el('button', `sw${on ? ' on' : ''}`); b.onclick = fn; return b; };
+  const row = (label, ctrl, hint) => { const r = el('div', 'row'); const l = el('div'); l.append(el('span', '', label)); if (hint) l.append(el('small', '', hint)); r.append(l, ctrl); return r; };
+
+  const toggle = (caption, on, fn) => { const w = el('label'); w.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:3px;font-size:10px;opacity:.9'; w.append(sw(on, fn), el('span', '', caption)); return w; };
+  const serviceCtl = (s) => {
+    const hidden = S.hidden.includes(s.id), muted = S.muted.includes(s.id);
+    const d = el('div', 'opts'); d.style.gap = '16px';
+    d.append(
+      toggle('Visibile', !hidden, () => set({ hidden: hidden ? S.hidden.filter((x) => x !== s.id) : [...S.hidden, s.id] })),
+      toggle('Notifiche', !muted, () => set({ muted: muted ? S.muted.filter((x) => x !== s.id) : [...S.muted, s.id] })),
+    );
+    return d;
+  };
+
+  function header() {
+    const h = el('header');
+    const logo = el('img'); logo.src = 'assets/logo.png'; logo.alt = '';
+    const t = el('div'); t.append(el('div', 'name', 'Onebox'), el('small', '', `Tutti i messaggi, un solo posto · v${VERSION}`));
+    const q = el('button', 'quit', '⏻ Esci'); q.title = 'Esci da Onebox'; q.onclick = () => settings.quit();
+    h.append(logo, t, q);
+    return h;
+  }
+
+  function render() {
+    const icons = el('div', 'opts');
+    for (const [k, label] of ICONS) {
+      const b = el('button', `ico${k === S.icon ? ' on' : ''}`); b.title = label;
+      const i = el('img'); i.src = `assets/${k}Template@2x.png`; b.append(i);
+      b.onclick = () => set({ icon: k });
+      icons.append(b);
+    }
+    const time = (key) => { const i = el('input'); i.type = 'time'; i.value = S.quiet[key]; i.onchange = () => i.value && set({ quiet: { ...S.quiet, [key]: i.value } }); return i; };
+    const quietCtl = el('div', 'opts'); quietCtl.style.alignItems = 'center';
+    quietCtl.append(time('from'), el('span', '', '→'), time('to'), sw(S.quiet.on, () => set({ quiet: { ...S.quiet, on: !S.quiet.on } })));
+
+    document.getElementById('app').replaceChildren(
+      header(),
+      el('h3', '', 'Aspetto'),
+      row('Tema', opts(THEMES, S.theme, 'theme')),
+      row('Larghezza del pannello', opts(WIDTHS, S.width, 'width'), 'Puoi anche trascinare il bordo del pannello'),
+      row('Zoom delle pagine', opts(ZOOMS, S.zoom, 'zoom'), 'Più basso = ci sta più contenuto (utile per WhatsApp)'),
+      row('Icona nella barra dei menu', icons),
+      row('Animazione dell’icona', sw(S.animate, () => set({ animate: !S.animate })), 'Solo con l’icona Cubo: si accende all’avvio e a ogni messaggio che passa i filtri'),
+      row('Numero dei non letti accanto all’icona', sw(S.showCount, () => set({ showCount: !S.showCount }))),
+      el('h3', '', 'Notifiche'),
+      row('Notifiche attive', sw(S.notifications, () => set({ notifications: !S.notifications }))),
+      row('Silenzio programmato', quietCtl, 'Le notifiche non compaiono in questa fascia oraria'),
+      el('h3', '', 'Servizi'),
+      el('small', '', 'Visibile: la scheda compare nella barra (tasto destro su una scheda per nasconderla). Notifiche: spento = niente notifiche, suoni né conteggio.'),
+      ...SV.map((s) => row(s.name, serviceCtl(s))),
+      row('WhatsApp: una colonna sola', sw(S.waSingle, () => set({ waSingle: !S.waSingle })), 'Aprendo una chat sparisce la lista. Per tornare indietro: Esc o il pulsante ‹ Chat'),
+      el('h3', '', 'Generale'),
+      row('Avvia Onebox al login', sw(S.launchAtLogin, () => set({ launchAtLogin: !S.launchAtLogin }))),
+      row('Svuota la cache dei media quando esci', sw(S.clearCacheOnQuit, () => set({ clearCacheOnQuit: !S.clearCacheOnQuit })), 'Foto e file visti non restano sul disco. Resti collegato'),
+      row('Chiudi il pannello cliccando fuori', sw(S.closeOnBlur, () => set({ closeOnBlur: !S.closeOnBlur }))),
+      row('Scorciatoia per aprire/chiudere', opts(SHORT, S.shortcut, 'shortcut'), 'Utile se l’icona è nascosta da Ice'),
+    );
+  }
+
+  async function load() { ({ settings: S, services: SV, icons: ICONS, version: VERSION } = await settings.get()); render(); }
+  settings.onOpen(load);
+  load();
+</script>
