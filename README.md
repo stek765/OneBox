@@ -144,7 +144,25 @@ A few details that took measuring rather than guessing:
 
 ## Install
 
-Needs macOS, Node.js and Python 3 only if you want to regenerate the icons.
+### Download (Apple Silicon)
+
+Grab `Onebox-0.3.0-arm64.dmg` from the [latest release](https://github.com/stek765/OneBox/releases/latest),
+open it and drag **Onebox** into Applications.
+
+**The app is not notarized by Apple** (it is signed ad-hoc), so macOS will refuse the first launch with
+"Apple could not verify…". This is expected. To open it anyway:
+
+- **macOS 15 (Sequoia) and later:** try to open the app once, then go to
+  *System Settings › Privacy & Security*, scroll down and click **Open Anyway**.
+- **Older macOS:** right click the app › **Open** › **Open**.
+- **Or from the terminal:** `xattr -dr com.apple.quarantine /Applications/Onebox.app`
+
+The release is built for Apple Silicon (M1 and later). On an Intel Mac, build it yourself.
+If you would rather not trust a binary, build it from the source: it is about 300 lines of `main.js`.
+
+### Build from source
+
+Needs macOS and Node.js. Python 3 only if you want to regenerate the icons.
 
 ```bash
 git clone https://github.com/stek765/OneBox.git
