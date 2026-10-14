@@ -42,12 +42,12 @@ const VALID = {
   hidden: (v) => Array.isArray(v) && v.every((x) => typeof x === 'string') && v.length < services.length, // at least one tab stays
   icon: (v) => ICONS.some(([k]) => k === v),
   launchAtLogin: bool, closeOnBlur: bool, showCount: bool, animate: bool,
-  clearCacheOnQuit: bool, waSingle: bool,
+  clearCacheOnQuit: bool,
   zoom: (v) => typeof v === 'number' && v >= 0.5 && v <= 1,
   width: (v) => Number.isInteger(v) && v >= 420 && v <= 1400,
   shortcut: (v) => SHORTCUTS.includes(v),
 };
-const SET_DEFAULTS = { theme: 'system', notifications: true, quiet: { on: false, from: '22:00', to: '08:00' }, muted: [], hidden: ['gmail'], icon: 'cubo', launchAtLogin: false, closeOnBlur: true, showCount: true, shortcut: '', zoom: 0.8, width: 820, clearCacheOnQuit: true, animate: true, waSingle: true };
+const SET_DEFAULTS = { theme: 'system', notifications: true, quiet: { on: false, from: '22:00', to: '08:00' }, muted: [], hidden: ['gmail'], icon: 'cubo', launchAtLogin: false, closeOnBlur: true, showCount: true, shortcut: '', zoom: 0.8, width: 820, clearCacheOnQuit: true, animate: true };
 let S = SET_DEFAULTS;
 const setFile = () => path.join(app.getPath('userData'), 'settings.json');
 const fromFile = (e) => e.senderFrame.url.startsWith('file:');
@@ -61,7 +61,6 @@ function loadSettings() {
 function applySettings() {
   nativeTheme.themeSource = S.theme;
   if (!animating) tray.setImage(trayImage(S.icon));
-  setWaSingle();
   // only on change: macOS logs an error even for a repeated "no"
   if (app.getLoginItemSettings().openAtLogin !== S.launchAtLogin) app.setLoginItemSettings({ openAtLogin: S.launchAtLogin });
   globalShortcut.unregisterAll();
@@ -94,7 +93,6 @@ app.on('before-quit', (e) => {
 const trayImage = (name) => nativeImage.createFromPath(path.join(__dirname, 'assets', `${name}Template@2x.png`));
 let animating = false;
 let waWc = null;
-const setWaSingle = () => waWc?.executeJavaScript(`document.documentElement.classList.toggle('ob-wa-single', ${S.waSingle})`).catch(() => {});
 function playTray(frames, ms) {
   if (!S.animate || S.icon !== 'cubo' || animating) return;
   animating = true;
@@ -200,10 +198,7 @@ function addService(svc) {
   wc.setAudioMuted(S.muted.includes(svc.id));
   // web apps are wide: zoom out to fit the columns. Reapplied on every navigation, Chromium resets it
   for (const ev of ['dom-ready', 'did-finish-load', 'did-navigate', 'did-navigate-in-page']) wc.on(ev, () => wc.setZoomFactor(S.zoom));
-  if (new URL(svc.url).hostname === 'web.whatsapp.com') {
-    waWc = wc;
-    for (const ev of ['dom-ready', 'did-finish-load']) wc.on(ev, setWaSingle);
-  }
+  if (new URL(svc.url).hostname === 'web.whatsapp.com') waWc = wc;
   wc.loadURL(svc.url);
   win.contentView.addChildView(view);
   views[svc.id] = view;

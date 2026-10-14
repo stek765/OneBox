@@ -39,13 +39,12 @@ if (location.protocol === 'file:') {
   })()`);
   if (location.hostname === 'web.whatsapp.com') {
     // Single column: while a chat is open (#main) ob-chat-open hides the list (the parent of #side).
-    // The CSS applies only with ob-wa-single, toggled by the main process from the settings.
     webFrame.executeJavaScript(`(() => {
-      const css = 'html.ob-wa-single.ob-chat-open div:has(> #side){display:none!important}'
-        + 'html.ob-wa-single.ob-chat-open #main header{padding-left:96px!important}'
+      const css = 'html.ob-chat-open div:has(> #side){display:none!important}'
+        + 'html.ob-chat-open #main header{padding-left:96px!important}'
         + '#ob-back{display:none;position:fixed;top:13px;left:74px;z-index:99999;padding:5px 12px;border:0;border-radius:16px;background:rgba(17,27,33,.85);color:#fff;font:600 13px -apple-system,sans-serif;cursor:pointer}'
-        + 'html.ob-wa-single.ob-chat-open #ob-back{display:block}'
-        + 'html.ob-wa-single .ob-line{border-left-width:0!important}';
+        + 'html.ob-chat-open #ob-back{display:block}'
+        + 'html .ob-line{border-left-width:0!important}';
       let queued = false, wasOpen = false;
       // side drawers keep their two-column size and draw a border across the chat: strip it
       const markLines = () => {

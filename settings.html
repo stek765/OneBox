@@ -87,7 +87,6 @@
       el('h3', '', 'Servizi'),
       el('small', '', 'Visibile: la scheda compare nella barra (tasto destro su una scheda per nasconderla). Notifiche: spento = niente notifiche, suoni né conteggio.'),
       ...SV.map((s) => row(s.name, serviceCtl(s))),
-      row('WhatsApp: una colonna sola', sw(S.waSingle, () => set({ waSingle: !S.waSingle })), 'Aprendo una chat sparisce la lista. Per tornare indietro: Esc o il pulsante ‹ Chat'),
       el('h3', '', 'Generale'),
       row('Avvia Onebox al login', sw(S.launchAtLogin, () => set({ launchAtLogin: !S.launchAtLogin }))),
       row('Svuota la cache dei media quando esci', sw(S.clearCacheOnQuit, () => set({ clearCacheOnQuit: !S.clearCacheOnQuit })), 'Foto e file visti non restano sul disco. Resti collegato'),

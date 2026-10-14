@@ -41,8 +41,8 @@ the same total sits next to the menu bar icon.
 Right click a tab to **hide** it, **mute** it (no notifications, sounds or count)
 or **reload** it.
 
-WhatsApp can run in **single-column mode**: open a chat and the list disappears,
-like any other tab. `Esc` or the **‹ Chat** button brings it back.
+WhatsApp is always **single-column**: open a chat and the list disappears, like
+any other tab. `Esc` or the **‹ Chat** button brings it back.
 
 <br>
 
@@ -69,7 +69,7 @@ page.
 |---|---|
 | **Look** | Theme (system / light / dark), panel width (or drag the edge), page zoom, icon style, animation, unread count |
 | **Notifications** | Global switch, **quiet hours** (`22:00 → 08:00`, crossing midnight works) |
-| **Services** | Per service: visible, notifications on/off. WhatsApp single-column mode |
+| **Services** | Per service: visible, notifications on/off |
 | **General** | Launch at login, clear media cache on quit, close on click outside, global shortcut |
 
 <br>
