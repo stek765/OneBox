@@ -31,7 +31,7 @@ still gets through.
 
 ## The panel
 
-<p align="center"><img src="docs/panel.jpg" alt="The panel under the menu bar icon, showing WhatsApp Web's QR sign-in" width="640"></p>
+<p align="center"><img src="docs/panel.gif" alt="The panel under the menu bar icon cycling through its tabs: WhatsApp, Telegram, Slack, Discord, Proton Mail and LinkedIn" width="640"></p>
 
 Each service is the real web app in its own view, with **separate cookies**
 (`persist:<id>`), so logins survive restarts and never mix. The number in a tab
