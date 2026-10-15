@@ -17,6 +17,7 @@ module.exports = {
     hideTab: 'Hide tab', unmute: 'Turn notifications and count back on', mute: 'Mute notifications and count', reload: 'Reload',
     editServices: 'Edit services… (then restart)', openSettings: 'Settings…', quitMenu: 'Quit Onebox', menuServices: 'Services',
     badServices: 'Invalid services.json ({0}). Using the default services.',
+    updateAvailable: 'Update available: v{0}', updateBtn: 'Download v{0}', updateHint: 'Installed with Homebrew? Run: brew upgrade --cask onebox',
   },
   it: {
     settings: 'Impostazioni', tagline: 'Tutti i messaggi, un solo posto', quit: 'Esci', quitTitle: 'Esci da Onebox',
@@ -35,5 +36,6 @@ module.exports = {
     hideTab: 'Nascondi scheda', unmute: 'Riattiva notifiche e conteggio', mute: 'Silenzia notifiche e conteggio', reload: 'Ricarica',
     editServices: 'Modifica servizi… (poi riavvia)', openSettings: 'Impostazioni…', quitMenu: 'Esci da Onebox', menuServices: 'Servizi',
     badServices: 'services.json non valido ({0}). Uso i servizi di default.',
+    updateAvailable: 'Aggiornamento disponibile: v{0}', updateBtn: 'Scarica v{0}', updateHint: 'Installata con Homebrew? Esegui: brew upgrade --cask onebox',
   },
 };

@@ -12,6 +12,7 @@ if (location.protocol === 'file:') {
     get: () => ipcRenderer.invoke('settings:get'),
     set: (patch) => ipcRenderer.invoke('settings:set', patch),
     quit: () => ipcRenderer.send('settings:quit'),
+    update: () => ipcRenderer.send('settings:update'),
     onOpen: (cb) => ipcRenderer.on('open', cb),
   });
 } else {
@@ -44,7 +45,9 @@ if (location.protocol === 'file:') {
         + 'html.ob-chat-open #main header{padding-left:96px!important}'
         + '#ob-back{display:none;position:fixed;top:13px;left:74px;z-index:99999;padding:5px 12px;border:0;border-radius:16px;background:rgba(17,27,33,.85);color:#fff;font:600 13px -apple-system,sans-serif;cursor:pointer}'
         + 'html.ob-chat-open #ob-back{display:block}'
-        + 'html .ob-line{border-left-width:0!important}';
+        + 'html .ob-line{border-left-width:0!important}'
+        // the emoji panel gets a negative inline left computed for the two-column layout: pin it inside the chat
+        + '#expressions-panel-container div[style*="transform-origin: center bottom"]{left:76px!important}';
       let queued = false, wasOpen = false;
       // side drawers keep their two-column size and draw a border across the chat: strip it
       const markLines = () => {

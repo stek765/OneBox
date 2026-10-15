@@ -1,4 +1,4 @@
-const { app, BrowserWindow, WebContentsView, Notification, Tray, ipcMain, shell, Menu, nativeTheme, nativeImage, globalShortcut, screen } = require('electron');
+const { app, BrowserWindow, WebContentsView, Notification, Tray, ipcMain, shell, Menu, nativeTheme, nativeImage, globalShortcut, screen, net } = require('electron');
 const fs = require('fs');
 const path = require('path');
 const { passes, inQuiet } = require('./filter');
@@ -103,6 +103,16 @@ function playTray(frames, ms) {
   let i = 0;
   const step = () => {
     if (i < frames.length) { tray.setImage(trayImage(frames[i++])); setTimeout(step, ms); } else { tray.setImage(trayImage(S.icon)); animating = false; }
+  };
+  step();
+}
+// Update available: every 10 minutes the icon blinks orange three times
+function pulseUpdate() {
+  if (!latest || !S.animate || animating) return;
+  animating = true;
+  let i = 0;
+  const step = () => {
+    if (i < 6) { tray.setImage(i % 2 === 0 ? nativeImage.createFromPath(path.join(__dirname, 'assets', `${S.icon}-orange@2x.png`)) : trayImage(S.icon)); i++; setTimeout(step, 450); } else { tray.setImage(trayImage(S.icon)); animating = false; }
   };
   step();
 }
@@ -239,7 +249,24 @@ ipcMain.on('tab-menu', (e, id) => {
     { label: T().reload, click: () => views[id].webContents.reload() },
   ]).popup({ window: win });
 });
-const settingsPayload = () => ({ settings: S, t: T(), services: services.map(({ id, name }) => ({ id, name })), icons: ICONS, version: app.getVersion() });
+// Update check: asks GitHub for the latest release once a day and only tells the user; nothing is downloaded or installed.
+const RELEASES = 'https://github.com/stek765/OneBox/releases/latest';
+let latest = null;
+const newer = (a, b) => { const x = a.split('.').map(Number), y = b.split('.').map(Number); for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0); return false; };
+async function checkUpdate() {
+  try {
+    const r = await net.fetch('https://api.github.com/repos/stek765/OneBox/releases/latest', { headers: { Accept: 'application/vnd.github+json' } });
+    const v = r.ok && String((await r.json()).tag_name || '').replace(/^v/, '');
+    if (!/^\d+\.\d+\.\d+$/.test(v) || !newer(v, app.getVersion()) || latest === v) return;
+    latest = v;
+    pulseUpdate();
+    const n = new Notification({ title: 'Onebox', body: T().updateAvailable.replace('{0}', v) });
+    n.on('click', () => shell.openExternal(RELEASES));
+    n.show();
+  } catch { /* offline: try again tomorrow */ }
+}
+ipcMain.on('settings:update', (e) => fromFile(e) && shell.openExternal(RELEASES));
+const settingsPayload = () => ({ settings: S, t: T(), services: services.map(({ id, name }) => ({ id, name })), icons: ICONS, version: app.getVersion(), latest });
 ipcMain.handle('settings:get', (e) => (fromFile(e) ? settingsPayload() : null));
 ipcMain.handle('settings:set', (e, patch) => {
   if (!fromFile(e)) return null;
@@ -305,6 +332,9 @@ app.whenReady().then(() => {
   layout();
   applySettings();
   playTray(START_FRAMES, 140); // build-up animation at launch
+  checkUpdate();
+  setInterval(checkUpdate, 24 * 3600 * 1000);
+  setInterval(pulseUpdate, 10 * 60 * 1000);
   bar.webContents.once('did-finish-load', () => { select(visible()[0].id); showPanel(); if (process.argv.includes('--settings')) toggleSettings(); });
   app.on('will-quit', () => globalShortcut.unregisterAll());
 });

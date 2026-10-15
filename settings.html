@@ -31,8 +31,8 @@
   const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
   const ZOOMS = [[1, '100%'], [0.9, '90%'], [0.8, '80%'], [0.7, '70%'], [0.6, '60%']];
   const LANGS = [['en', 'English'], ['it', 'Italiano']];
-  let S, SV, ICONS, VERSION, t;
-  const apply = (p) => ({ settings: S, services: SV, icons: ICONS, version: VERSION, t } = p);
+  let S, SV, ICONS, VERSION, LATEST, t;
+  const apply = (p) => ({ settings: S, services: SV, icons: ICONS, version: VERSION, latest: LATEST, t } = p);
 
   const set = async (patch) => { apply(await settings.set(patch)); render(); };
   const opts = (list, cur, key) => { const d = el('div', 'opts'); for (const [v, label] of list) { const b = el('button', v === cur ? 'on' : '', label); b.onclick = () => set({ [key]: v }); d.append(b); } return d; };
@@ -49,6 +49,8 @@
     );
     return d;
   };
+
+  const updateBtn = () => { const b = el('button', 'on', t.updateBtn.replace('{0}', LATEST)); b.onclick = () => settings.update(); return b; };
 
   function header() {
     const h = el('header');
@@ -76,6 +78,7 @@
     const THEMES = [['system', t.system], ['light', t.light], ['dark', t.dark]];
     document.getElementById('app').replaceChildren(
       header(),
+      ...(LATEST ? [row(t.updateAvailable.replace('{0}', LATEST), updateBtn(), t.updateHint)] : []),
       el('h3', '', t.secLook),
       row(t.theme, opts(THEMES, S.theme, 'theme')),
       row(t.width, opts(WIDTHS, S.width, 'width'), t.widthHint),

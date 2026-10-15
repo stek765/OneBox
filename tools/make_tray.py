@@ -85,4 +85,8 @@ if __name__ == '__main__':
         save(frame(w, P), os.path.join(here, f'pulse-{i}Template@2x.png'))
     for k in ('pieno', 'contorno', 'aperto'):
         save(shapes(k), os.path.join(here, f'{k}Template@2x.png'))
+    # update available: same shapes in orange. No "Template" suffix, so macOS keeps the colour
+    for k, img in (('cubo', frame(REST, P)), *((k, shapes(k)) for k in ('pieno', 'contorno', 'aperto'))):
+        img[..., :3] = (255, 138, 31)
+        save(img, os.path.join(here, f'{k}-orange@2x.png'))
     print(sorted(os.listdir(here)))
