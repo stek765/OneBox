@@ -42,14 +42,14 @@ const VALID = {
   muted: (v) => Array.isArray(v) && v.every((x) => typeof x === 'string'),
   hidden: (v) => Array.isArray(v) && v.every((x) => typeof x === 'string') && v.length < services.length, // at least one tab stays
   icon: (v) => ICONS.some(([k]) => k === v),
-  launchAtLogin: bool, closeOnBlur: bool, showCount: bool, animate: bool,
+  launchAtLogin: bool, closeOnBlur: bool, showCount: bool, animate: bool, updateBadge: bool,
   clearCacheOnQuit: bool,
   zoom: (v) => typeof v === 'number' && v >= 0.5 && v <= 1,
   width: (v) => Number.isInteger(v) && v >= 420 && v <= 1400,
   shortcut: (v) => SHORTCUTS.includes(v),
   lang: (v) => v in STR,
 };
-const SET_DEFAULTS = { theme: 'light', notifications: true, quiet: { on: false, from: '22:00', to: '08:00' }, muted: [], hidden: ['gmail'], icon: 'cubo', launchAtLogin: false, closeOnBlur: true, showCount: true, lang: 'en', shortcut: '', zoom: 0.8, width: 820, clearCacheOnQuit: true, animate: true };
+const SET_DEFAULTS = { theme: 'light', notifications: true, quiet: { on: false, from: '22:00', to: '08:00' }, muted: [], hidden: ['gmail'], icon: 'cubo', launchAtLogin: false, closeOnBlur: true, showCount: true, lang: 'en', shortcut: '', zoom: 0.8, width: 820, clearCacheOnQuit: true, animate: true, updateBadge: true };
 let S = SET_DEFAULTS;
 const T = () => STR[S.lang];
 const setFile = () => path.join(app.getPath('userData'), 'settings.json');
@@ -64,7 +64,7 @@ function loadSettings() {
 function applySettings() {
   nativeTheme.themeSource = S.theme;
   buildAppMenu();
-  if (!animating) tray.setImage(trayImage(S.icon));
+  if (!animating) tray.setImage(restIcon());
   // only on change: macOS logs an error even for a repeated "no"
   if (app.getLoginItemSettings().openAtLogin !== S.launchAtLogin) app.setLoginItemSettings({ openAtLogin: S.launchAtLogin });
   globalShortcut.unregisterAll();
@@ -95,6 +95,8 @@ app.on('before-quit', (e) => {
 
 // Tray animations (Cube icon only): frames from assets/, one every `ms`, then back to rest
 const trayImage = (name) => nativeImage.createFromPath(path.join(__dirname, 'assets', `${name}Template@2x.png`));
+// the resting icon: soft orange (not a template, macOS keeps the colour) while an update is waiting
+const restIcon = () => (latest && S.updateBadge ? nativeImage.createFromPath(path.join(__dirname, 'assets', `${S.icon}-orange@2x.png`)) : trayImage(S.icon));
 let animating = false;
 let waWc = null;
 function playTray(frames, ms) {
@@ -102,17 +104,7 @@ function playTray(frames, ms) {
   animating = true;
   let i = 0;
   const step = () => {
-    if (i < frames.length) { tray.setImage(trayImage(frames[i++])); setTimeout(step, ms); } else { tray.setImage(trayImage(S.icon)); animating = false; }
-  };
-  step();
-}
-// Update available: every 10 minutes the icon blinks orange three times
-function pulseUpdate() {
-  if (!latest || !S.animate || animating) return;
-  animating = true;
-  let i = 0;
-  const step = () => {
-    if (i < 6) { tray.setImage(i % 2 === 0 ? nativeImage.createFromPath(path.join(__dirname, 'assets', `${S.icon}-orange@2x.png`)) : trayImage(S.icon)); i++; setTimeout(step, 450); } else { tray.setImage(trayImage(S.icon)); animating = false; }
+    if (i < frames.length) { tray.setImage(trayImage(frames[i++])); setTimeout(step, ms); } else { tray.setImage(restIcon()); animating = false; }
   };
   step();
 }
@@ -169,7 +161,9 @@ function pushState() {
   const list = visible().map((s) => ({ id: s.id, name: s.name, unread: S.muted.includes(s.id) ? 0 : unread[s.id] || 0 }));
   bar.webContents.send('state', { current, settingsOpen, arrowX, list, gearTitle: T().settings });
   const total = list.reduce((a, s) => a + s.unread, 0);
-  tray.setTitle(S.showCount && total ? ` ${total}` : '');
+  // next to the icon: with an update waiting (and updateBadge on) the new version replaces the count, which would read like part of it
+  if (!animating) tray.setImage(restIcon());
+  tray.setTitle(latest && S.updateBadge ? ` ↑${latest}` : S.showCount && total ? ` ${total}` : '');
 }
 
 function layout() {
@@ -259,7 +253,7 @@ async function checkUpdate() {
     const v = r.ok && String((await r.json()).tag_name || '').replace(/^v/, '');
     if (!/^\d+\.\d+\.\d+$/.test(v) || !newer(v, app.getVersion()) || latest === v) return;
     latest = v;
-    pulseUpdate();
+    pushState();
     const n = new Notification({ title: 'Onebox', body: T().updateAvailable.replace('{0}', v) });
     n.on('click', () => shell.openExternal(RELEASES));
     n.show();
@@ -334,7 +328,6 @@ app.whenReady().then(() => {
   playTray(START_FRAMES, 140); // build-up animation at launch
   checkUpdate();
   setInterval(checkUpdate, 24 * 3600 * 1000);
-  setInterval(pulseUpdate, 10 * 60 * 1000);
   bar.webContents.once('did-finish-load', () => { select(visible()[0].id); showPanel(); if (process.argv.includes('--settings')) toggleSettings(); });
   app.on('will-quit', () => globalShortcut.unregisterAll());
 });

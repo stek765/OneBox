@@ -3,14 +3,14 @@
 <style>
   :root { color-scheme: light dark; --bg: #fff; --text: #1d1f2b; --line: rgba(60, 70, 120, .16); --soft: rgba(60, 70, 120, .1); --accent: #4f7cff; }
   @media (prefers-color-scheme: dark) { :root { --bg: #1f2233; --text: #e8ebf7; --line: rgba(160, 175, 235, .18); --soft: rgba(160, 175, 235, .14); } }
-  body { font: 13px -apple-system, sans-serif; margin: 0; padding: 18px 28px 32px; overflow-y: auto; height: 100vh; box-sizing: border-box; background: var(--bg); color: var(--text); }
+  body { font: 13px -apple-system, sans-serif; margin: 0; padding: 18px 28px 0; overflow-y: auto; height: 100vh; box-sizing: border-box; background: var(--bg); color: var(--text); }
   header { display: flex; align-items: center; gap: 14px; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
   header img { width: 46px; height: 46px; }
   header .name { font-size: 20px; font-weight: 700; letter-spacing: -.01em; }
   header small { display: block; opacity: .6; margin-top: 1px; }
   header .quit { margin-left: auto; display: flex; align-items: center; gap: 6px; }
   header .quit:hover { color: #ff6369; border-color: #ff6369; }
-  h3 { margin: 24px 0 6px; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; opacity: .55; }
+  h3 { margin: 28px 0 6px; padding: 8px 12px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; border-left: 3px solid #ff9a52; border-radius: 0 7px 7px 0; background: rgba(255, 154, 82, .14); }
   .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--line); }
   .opts { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
   button { font: inherit; color: inherit; border: 1px solid var(--line); background: transparent; border-radius: 7px; padding: 4px 10px; cursor: pointer; }
@@ -25,6 +25,8 @@
   .ico.on img { filter: invert(1); }
   input[type=time] { font: inherit; color: inherit; background: transparent; border: 1px solid var(--line); border-radius: 7px; padding: 3px 6px; }
   small { opacity: .6; display: block; margin-top: 2px; }
+  /* full width, flush with the bottom: the dusk colours of the README screenshots, a bit lighter */
+  footer { margin: 32px -28px 0; padding: 22px 28px; text-align: center; font-weight: 600; color: #fff; background: linear-gradient(135deg, #2f3350 0%, #6b4a5a 50%, #e39a6a 100%); }
 </style>
 <div id="app"></div>
 <script>
@@ -86,6 +88,7 @@
       row(t.icon, icons),
       row(t.animate, sw(S.animate, () => set({ animate: !S.animate })), t.animateHint),
       row(t.count, sw(S.showCount, () => set({ showCount: !S.showCount }))),
+      row(t.updateBadge, sw(S.updateBadge, () => set({ updateBadge: !S.updateBadge })), t.updateBadgeHint),
       el('h3', '', t.secNotif),
       row(t.notif, sw(S.notifications, () => set({ notifications: !S.notifications }))),
       row(t.quiet, quietCtl, t.quietHint),
@@ -98,6 +101,7 @@
       row(t.clearCache, sw(S.clearCacheOnQuit, () => set({ clearCacheOnQuit: !S.clearCacheOnQuit })), t.clearCacheHint),
       row(t.blur, sw(S.closeOnBlur, () => set({ closeOnBlur: !S.closeOnBlur }))),
       row(t.shortcut, opts(SHORT, S.shortcut, 'shortcut'), t.shortcutHint),
+      el('footer', '', `Onebox v${VERSION} · open source`),
     );
   }
 

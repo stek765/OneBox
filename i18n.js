@@ -18,6 +18,7 @@ module.exports = {
     editServices: 'Edit services… (then restart)', openSettings: 'Settings…', quitMenu: 'Quit Onebox', menuServices: 'Services',
     badServices: 'Invalid services.json ({0}). Using the default services.',
     updateAvailable: 'Update available: v{0}', updateBtn: 'Download v{0}', updateHint: 'Installed with Homebrew? Run: brew upgrade --cask onebox',
+    updateBadge: 'Show new versions in the menu bar', updateBadgeHint: 'Orange icon and ↑version replace the unread count until you update. Off: the count stays',
   },
   it: {
     settings: 'Impostazioni', tagline: 'Tutti i messaggi, un solo posto', quit: 'Esci', quitTitle: 'Esci da Onebox',
@@ -37,5 +38,6 @@ module.exports = {
     editServices: 'Modifica servizi… (poi riavvia)', openSettings: 'Impostazioni…', quitMenu: 'Esci da Onebox', menuServices: 'Servizi',
     badServices: 'services.json non valido ({0}). Uso i servizi di default.',
     updateAvailable: 'Aggiornamento disponibile: v{0}', updateBtn: 'Scarica v{0}', updateHint: 'Installata con Homebrew? Esegui: brew upgrade --cask onebox',
+    updateBadge: 'Mostra le nuove versioni nella barra dei menu', updateBadgeHint: 'Icona arancione e ↑versione prendono il posto del numero dei non letti finché non aggiorni. Spento: il numero resta',
   },
 };
