@@ -80,10 +80,26 @@ page.
 
 | Group | What you can change |
 |---|---|
-| **Look** | Theme (light by default, or system / dark), panel width (or drag the edge), page zoom, icon style, animation, unread count |
+| **Look** | Theme (light by default, or system / dark), panel width (or drag the edge), page zoom, icon style, animation, unread count, new-version notice in the menu bar |
 | **Notifications** | Global switch, **quiet hours** (`22:00 → 08:00`, crossing midnight works) |
 | **Services** | Per service: visible, notifications on/off |
 | **General** | Language (English / Italiano), launch at login, clear media cache on quit, close on click outside, global shortcut |
+
+### Updates
+
+Once a day Onebox asks GitHub for the latest release. If there is a newer one you
+get a notification, the icon turns soft orange and shows `↑version` next to it
+(instead of the unread count: switch it off in Settings and the count stays), and
+Settings shows **Update to vX**.
+
+Nothing happens until you press it. Then Onebox downloads the `.dmg`, checks its
+sha256 against the digest GitHub reports for that file, and offers **Restart to
+install**: it quits, verifies the signature of the new app, swaps it in place and
+reopens. If any step fails the old app stays as it was. The checksum comes from
+GitHub itself, so it guards against a damaged download, not against a hijacked
+account. Installed with Homebrew? `brew upgrade --cask onebox` does the same.
+
+Only one copy runs at a time: opening a second one just shows the first.
 
 <br>
 
@@ -158,7 +174,7 @@ open it and drag **Onebox** into Applications.
 - **Or from the terminal:** `xattr -dr com.apple.quarantine /Applications/Onebox.app`
 
 The release is built for Apple Silicon (M1 and later). On an Intel Mac, build it yourself.
-If you would rather not trust a binary, build it from the source: it is about 300 lines of `main.js`.
+If you would rather not trust a binary, build it from the source: it is about 400 lines of `main.js`.
 
 ### Homebrew
 
@@ -177,10 +193,10 @@ Needs macOS and Node.js. Python 3 only if you want to regenerate the icons.
 git clone https://github.com/stek765/OneBox.git
 cd OneBox
 ./build.sh
-open ~/Applications/Onebox.app
+open /Applications/Onebox.app
 ```
 
-`build.sh` packages a real `Onebox.app`: macOS does not show notifications from a
+`build.sh` installs into `/Applications` (`OUT=/some/path/Onebox.app ./build.sh` to put it elsewhere) and packages a real `Onebox.app`: macOS does not show notifications from a
 bare Electron process. It sets the bundle id, hides the Dock icon, builds the
 `.icns` from [`assets/logo.png`](assets/logo.png) and signs ad-hoc.
 
@@ -197,7 +213,7 @@ global shortcut can be set in the settings.
 - It only works while the app is running. Pushes to a tab that was never loaded are not intercepted.
 - **Gmail** is in the list but hidden: enable it in Settings › Services. It does not work (Google blocks the sign-in, see above). The way around it is IMAP with an app password, or OAuth in the system browser. Not built yet.
 - LinkedIn is view-only: no automation of any kind.
-- The app is signed **ad-hoc**: there is no verified identity behind it. Build it yourself and read the ~300 lines of `main.js`.
+- The app is signed **ad-hoc**: there is no verified identity behind it. Build it yourself and read the ~400 lines of `main.js`.
 - Onebox saves no files by itself and clears the media cache on quit. Chats and logins stay.
 
 <br>
@@ -211,7 +227,7 @@ filter.js        allow / deny regexes and quiet hours (+ self-check)
 tabs.html        tab bar with the arrow
 settings.html    settings page
 i18n.js          English and Italian UI strings
-build.sh         builds ~/Applications/Onebox.app
+build.sh         builds /Applications/Onebox.app
 tools/           logo and menu bar icon generators (Python + numpy)
 assets/          logo and icon frames
 ```
