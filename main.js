@@ -2,7 +2,7 @@ const { app, BrowserWindow, WebContentsView, Notification, Tray, ipcMain, shell,
 const fs = require('fs');
 const os = require('os');
 const crypto = require('crypto');
-const { spawn } = require('child_process');
+const { spawn, execFile } = require('child_process');
 const path = require('path');
 const { passes, inQuiet } = require('./filter');
 const STR = require('./i18n');
@@ -73,8 +73,6 @@ function applySettings() {
   nativeTheme.themeSource = S.theme;
   buildAppMenu();
   if (!animating) tray.setImage(restIcon());
-  // only on change: macOS logs an error even for a repeated "no"
-  if (app.getLoginItemSettings().openAtLogin !== S.launchAtLogin) app.setLoginItemSettings({ openAtLogin: S.launchAtLogin });
   globalShortcut.unregisterAll();
   if (S.shortcut) globalShortcut.register(S.shortcut, togglePanel);
   for (const [id, v] of Object.entries(views)) {
@@ -124,6 +122,8 @@ const visible = () => services.filter((s) => !S.hidden.includes(s.id));
 function updateSettings(patch) {
   for (const [k, v] of Object.entries(patch)) if (VALID[k]?.(v)) S[k] = v;
   fs.writeFileSync(setFile(), JSON.stringify(S, null, 2));
+  // only when that switch changes: every registration makes macOS show a "login item added" notice
+  if ('launchAtLogin' in patch) app.setLoginItemSettings({ openAtLogin: S.launchAtLogin });
   applySettings();
 }
 
@@ -140,6 +140,18 @@ function buildAppMenu() {
 }
 
 const togglePanel = () => (win.isVisible() ? win.hide() : showPanel());
+
+// Dragging a file in starts with a click in Finder, which blurs the panel. Wait for the mouse button
+// to be released (Electron can't read it, AppKit can): released over the panel = a drop, keep it open.
+function hideUnlessDrop() {
+  const js = "ObjC.import('AppKit'); const was = $.NSEvent.pressedMouseButtons & 1; while ($.NSEvent.pressedMouseButtons & 1) delay(0.03); was ? 'down' : ''";
+  execFile('osascript', ['-l', 'JavaScript', '-e', js], (_err, out) => {
+    if (!win.isVisible()) return;
+    const p = screen.getCursorScreenPoint(), b = win.getBounds();
+    const over = p.x >= b.x && p.x < b.x + b.width && p.y >= b.y && p.y < b.y + b.height;
+    if (String(out).trim() === 'down' && over) { app.focus({ steal: true }); win.focus(); } else win.hide();
+  });
+}
 
 function toggleSettings() {
   settingsOpen = !settingsOpen;
@@ -362,7 +374,7 @@ app.whenReady().then(() => {
   ])));
 
   win = new BrowserWindow({ width: S.width, height: 780, show: false, frame: false, resizable: true, fullscreenable: false, skipTaskbar: true, alwaysOnTop: true, transparent: true, backgroundColor: '#00000000', hasShadow: true });
-  win.on('blur', () => S.closeOnBlur && win.hide()); // click outside closes it
+  win.on('blur', () => S.closeOnBlur && hideUnlessDrop()); // click outside closes it
   bar = new WebContentsView({ webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, sandbox: true } });
   bar.webContents.loadFile(path.join(__dirname, 'tabs.html'));
   win.contentView.addChildView(bar);

@@ -50,7 +50,9 @@ if (location.protocol === 'file:') {
         + 'html.ob-chat-open #ob-back{display:block}'
         + 'html .ob-line{border-left-width:0!important}'
         // the emoji panel gets a negative inline left computed for the two-column layout: pin it inside the chat
-        + '#expressions-panel-container div[style*="transform-origin: center bottom"]{left:76px!important}';
+        + '#expressions-panel-container div[style*="transform-origin: center bottom"]{left:76px!important}'
+        // the overlay layer (drop zone, media preview) keeps a 40% slot for the list: collapse it so they cover the chat
+        + 'html.ob-chat-open div:has(> div > #side) > div:not(:has(#side)):has(> :nth-child(2):last-child) > :first-child{flex:0 0 0!important;max-width:0!important}';
       let queued = false, wasOpen = false;
       // side drawers keep their two-column size and draw a border across the chat: strip it
       const markLines = () => {
