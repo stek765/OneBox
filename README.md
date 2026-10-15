@@ -92,7 +92,9 @@ get a notification, the icon turns soft orange and shows `↑version` next to it
 (instead of the unread count: switch it off in Settings and the count stays), and
 Settings shows **Update to vX**.
 
-Nothing happens until you press it. Then Onebox downloads the `.dmg`, checks its
+Nothing happens until you press it. When the new version runs on the same Electron,
+Onebox downloads only its own code (a zip of about 50 KB, signed again on your Mac
+like a local build); otherwise it downloads the whole `.dmg`. Either way it checks its
 sha256 against the digest GitHub reports for that file, and offers **Restart to
 install**: it quits, verifies the signature of the new app, swaps it in place and
 reopens. If any step fails the old app stays as it was. The checksum comes from

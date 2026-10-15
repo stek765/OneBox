@@ -264,19 +264,26 @@ ipcMain.on('tab-menu', (e, id) => {
 });
 // Update check: asks GitHub for the latest release once a day. Downloading and installing only happen when the user presses the button.
 const RELEASES = 'https://github.com/stek765/OneBox/releases/latest';
+// ONEBOX_UPDATE_API points the check at a local feed, to test an update end to end without publishing one
+const API = process.env.ONEBOX_UPDATE_API || 'https://api.github.com/repos/stek765/OneBox/releases/latest';
+const TRUSTED = process.env.ONEBOX_UPDATE_API ? /^(https:\/\/github\.com\/stek765\/OneBox\/|http:\/\/127\.0\.0\.1:)/ : /^https:\/\/github\.com\/stek765\/OneBox\//;
 let latest = null, asset = null;
 let upd = { state: 'idle', pct: 0 }; // idle | downloading | ready | error
 const newer = (a, b) => { const x = a.split('.').map(Number), y = b.split('.').map(Number); for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0); return false; };
 const setUpd = (u) => { upd = u; settingsView?.webContents.send('update-state'); };
 async function checkUpdate() {
   try {
-    const r = await net.fetch('https://api.github.com/repos/stek765/OneBox/releases/latest', { headers: { Accept: 'application/vnd.github+json' } });
+    const r = await net.fetch(API, { headers: { Accept: 'application/vnd.github+json' } });
     const rel = r.ok && (await r.json());
     const v = String(rel.tag_name || '').replace(/^v/, '');
     if (!/^\d+\.\d+\.\d+$/.test(v) || !newer(v, app.getVersion()) || latest === v) return;
-    // the dmg and its sha256 as GitHub reports them; without a digest we only point to the release page
-    const a = (rel.assets || []).find((x) => /-arm64\.dmg$/.test(x.name));
-    asset = a && /^sha256:[0-9a-f]{64}$/.test(a.digest || '') && a.browser_download_url.startsWith('https://github.com/stek765/OneBox/') ? { url: a.browser_download_url, sha256: a.digest.slice(7), name: a.name } : null;
+    // a file and its sha256 as GitHub reports them; without a digest we only point to the release page
+    const ok = (x) => x && /^sha256:[0-9a-f]{64}$/.test(x.digest || '') && TRUSTED.test(x.browser_download_url);
+    const pick = (x, kind) => ({ url: x.browser_download_url, sha256: x.digest.slice(7), name: x.name, kind });
+    // same Electron as ours: only Onebox's own code is needed (~50 KB) instead of the whole dmg (~130 MB)
+    const zip = (rel.assets || []).find((x) => x.name === `Onebox-app-${v}-electron${process.versions.electron}.zip`);
+    const dmg = (rel.assets || []).find((x) => /-arm64\.dmg$/.test(x.name));
+    asset = ok(zip) ? pick(zip, 'app') : ok(dmg) ? pick(dmg, 'dmg') : null;
     latest = v;
     pushState();
     const n = new Notification({ title: 'Onebox', body: T().updateAvailable.replace('{0}', v) });
@@ -303,7 +310,7 @@ async function downloadUpdate() {
     }
     await new Promise((ok) => out.end(ok));
     if (hash.digest('hex') !== asset.sha256) throw new Error('checksum mismatch');
-    setUpd({ state: 'ready', pct: 100, file });
+    setUpd({ state: 'ready', pct: 100, file, kind: asset.kind });
   } catch (e) {
     fs.rm(file, () => {});
     setUpd({ state: 'error', pct: 0 });
@@ -312,10 +319,13 @@ async function downloadUpdate() {
 // Waits for this process to exit, checks the signature of the new app, swaps it in place and reopens it. A failure at any step leaves the old app untouched.
 function installUpdate() {
   if (upd.state !== 'ready') return;
-  const script = 'while kill -0 "$1" 2>/dev/null; do sleep 0.3; done; M=$(mktemp -d); '
-    + 'if hdiutil attach -nobrowse -readonly -mountpoint "$M" "$2" >/dev/null; then '
-    + 'ditto "$M/Onebox.app" "$3.new" && codesign --verify --deep --strict "$3.new" && rm -rf "$3" && mv "$3.new" "$3" || rm -rf "$3.new"; '
-    + 'hdiutil detach "$M" -quiet; fi; rm -f "$2"; open "$3"';
+  const swap = 'codesign --verify --deep --strict "$3.new" && rm -rf "$3" && mv "$3.new" "$3" || rm -rf "$3.new"; ';
+  const script = 'while kill -0 "$1" 2>/dev/null; do sleep 0.3; done; '
+    + (upd.kind === 'app'
+      // new code into a copy of this app; changing the bundle breaks its ad-hoc signature, so it is signed again like build.sh does
+      ? 'ditto "$3" "$3.new" && rm -rf "$3.new/Contents/Resources/app" && ditto -x -k "$2" "$3.new/Contents/Resources" && codesign --force --deep --sign - "$3.new" && ' + swap
+      : 'M=$(mktemp -d); if hdiutil attach -nobrowse -readonly -mountpoint "$M" "$2" >/dev/null; then ditto "$M/Onebox.app" "$3.new" && ' + swap + 'hdiutil detach "$M" -quiet; fi; ')
+    + 'rm -f "$2"; open "$3"';
   spawn('/bin/sh', ['-c', script, 'sh', String(process.pid), upd.file, appBundle()], { detached: true, stdio: 'ignore' }).unref();
   app.quit();
 }
