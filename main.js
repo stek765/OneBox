@@ -84,12 +84,11 @@ function applySettings() {
   pushState();
 }
 
-// Clears HTTP cache and Cache Storage (where seen photos and files end up). IndexedDB stays: it keeps the logins.
-const clearCaches = () => Promise.all(Object.values(views).map(async (v) => {
-  const ses = v.webContents.session;
-  await ses.clearCache();
-  await ses.clearStorageData({ storages: ['cachestorage'] });
-}));
+// Clears Cache Storage, where seen photos and files end up (WhatsApp: lru-media-array-buffer-cache).
+// The HTTP cache stays: it holds each site's own code, and wiping it made WhatsApp re-download
+// ~10 MB and start ~3 s slower every time (measured 15/10). IndexedDB stays too: it keeps the logins.
+const clearCaches = () => Promise.all(Object.values(views).map((v) =>
+  v.webContents.session.clearStorageData({ storages: ['cachestorage'] })));
 let cleaned = false;
 app.on('before-quit', (e) => {
   if (!S.clearCacheOnQuit || cleaned) return;
