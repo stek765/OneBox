@@ -33,8 +33,8 @@
   const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
   const ZOOMS = [[1, '100%'], [0.9, '90%'], [0.8, '80%'], [0.7, '70%'], [0.6, '60%']];
   const LANGS = [['en', 'English'], ['it', 'Italiano']];
-  let S, SV, ICONS, VERSION, LATEST, t;
-  const apply = (p) => ({ settings: S, services: SV, icons: ICONS, version: VERSION, latest: LATEST, t } = p);
+  let S, SV, ICONS, VERSION, LATEST, UPD, CAN, t;
+  const apply = (p) => ({ settings: S, services: SV, icons: ICONS, version: VERSION, latest: LATEST, upd: UPD, canInstall: CAN, t } = p);
 
   const set = async (patch) => { apply(await settings.set(patch)); render(); };
   const opts = (list, cur, key) => { const d = el('div', 'opts'); for (const [v, label] of list) { const b = el('button', v === cur ? 'on' : '', label); b.onclick = () => set({ [key]: v }); d.append(b); } return d; };
@@ -52,7 +52,15 @@
     return d;
   };
 
-  const updateBtn = () => { const b = el('button', 'on', t.updateBtn.replace('{0}', LATEST)); b.onclick = () => settings.update(); return b; };
+  const updateBtn = () => {
+    const f = (k) => t[k].replace('{0}', LATEST);
+    if (!CAN) { const b = el('button', 'on', f('updateOpen')); b.onclick = () => settings.update(); return b; }
+    if (UPD.state === 'downloading') { const b = el('button', '', t.updating.replace('{0}', UPD.pct)); b.disabled = true; return b; }
+    if (UPD.state === 'ready') { const b = el('button', 'on', f('updateReady')); b.onclick = () => settings.install(); return b; }
+    const b = el('button', 'on', UPD.state === 'error' ? t.updateFailed : f('updateBtn'));
+    b.onclick = () => (UPD.state === 'error' ? settings.openRelease() : settings.update());
+    return b;
+  };
 
   function header() {
     const h = el('header');
@@ -107,5 +115,6 @@
 
   async function load() { apply(await settings.get()); render(); }
   settings.onOpen(load);
+  settings.onUpdate(load);
   load();
 </script>

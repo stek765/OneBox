@@ -13,6 +13,9 @@ if (location.protocol === 'file:') {
     set: (patch) => ipcRenderer.invoke('settings:set', patch),
     quit: () => ipcRenderer.send('settings:quit'),
     update: () => ipcRenderer.send('settings:update'),
+    openRelease: () => ipcRenderer.send('settings:release'),
+    install: () => ipcRenderer.send('settings:install'),
+    onUpdate: (cb) => ipcRenderer.on('update-state', cb),
     onOpen: (cb) => ipcRenderer.on('open', cb),
   });
 } else {

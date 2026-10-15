@@ -146,7 +146,7 @@ A few details that took measuring rather than guessing:
 
 ### Download (Apple Silicon)
 
-Grab `Onebox-0.3.2-arm64.dmg` from the [latest release](https://github.com/stek765/OneBox/releases/latest),
+Grab `Onebox-0.3.3-arm64.dmg` from the [latest release](https://github.com/stek765/OneBox/releases/latest),
 open it and drag **Onebox** into Applications.
 
 **The app is not notarized by Apple** (it is signed ad-hoc), so macOS will refuse the first launch with

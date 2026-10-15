@@ -1,12 +1,12 @@
 #!/bin/sh
-# Packages the app into ~/Applications/Onebox.app. It must be a real .app:
+# Packages the app into /Applications/Onebox.app (or $OUT). It must be a real .app:
 # macOS does not show notifications from a bare Electron.
 set -e
 cd "$(dirname "$0")"
 npm install --no-audit --no-fund
 # with ignore-scripts the Electron binary is not downloaded by npm
 [ -d node_modules/electron/dist/Electron.app ] || node node_modules/electron/install.js
-OUT="$HOME/Applications/Onebox.app"
+OUT="${OUT:-/Applications/Onebox.app}" # one place only: a second copy elsewhere would show up as a second icon
 rm -rf "$OUT"
 ditto node_modules/electron/dist/Electron.app "$OUT"
 mkdir -p "$OUT/Contents/Resources/app"

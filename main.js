@@ -1,8 +1,16 @@
 const { app, BrowserWindow, WebContentsView, Notification, Tray, ipcMain, shell, Menu, nativeTheme, nativeImage, globalShortcut, screen, net } = require('electron');
 const fs = require('fs');
+const os = require('os');
+const crypto = require('crypto');
+const { spawn } = require('child_process');
 const path = require('path');
 const { passes, inQuiet } = require('./filter');
 const STR = require('./i18n');
+
+// Two copies would fight over the same profile (WhatsApp would show its QR code): the second one just opens the panel of the first
+const gotLock = app.requestSingleInstanceLock();
+if (!gotLock) app.quit();
+app.on('second-instance', () => win && showPanel());
 
 // Default services, copied to services.json on first run. allow/deny are case-insensitive regexes tested on "title\nbody".
 const DEFAULTS = [
@@ -243,24 +251,67 @@ ipcMain.on('tab-menu', (e, id) => {
     { label: T().reload, click: () => views[id].webContents.reload() },
   ]).popup({ window: win });
 });
-// Update check: asks GitHub for the latest release once a day and only tells the user; nothing is downloaded or installed.
+// Update check: asks GitHub for the latest release once a day. Downloading and installing only happen when the user presses the button.
 const RELEASES = 'https://github.com/stek765/OneBox/releases/latest';
-let latest = null;
+let latest = null, asset = null;
+let upd = { state: 'idle', pct: 0 }; // idle | downloading | ready | error
 const newer = (a, b) => { const x = a.split('.').map(Number), y = b.split('.').map(Number); for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0); return false; };
+const setUpd = (u) => { upd = u; settingsView?.webContents.send('update-state'); };
 async function checkUpdate() {
   try {
     const r = await net.fetch('https://api.github.com/repos/stek765/OneBox/releases/latest', { headers: { Accept: 'application/vnd.github+json' } });
-    const v = r.ok && String((await r.json()).tag_name || '').replace(/^v/, '');
+    const rel = r.ok && (await r.json());
+    const v = String(rel.tag_name || '').replace(/^v/, '');
     if (!/^\d+\.\d+\.\d+$/.test(v) || !newer(v, app.getVersion()) || latest === v) return;
+    // the dmg and its sha256 as GitHub reports them; without a digest we only point to the release page
+    const a = (rel.assets || []).find((x) => /-arm64\.dmg$/.test(x.name));
+    asset = a && /^sha256:[0-9a-f]{64}$/.test(a.digest || '') && a.browser_download_url.startsWith('https://github.com/stek765/OneBox/') ? { url: a.browser_download_url, sha256: a.digest.slice(7), name: a.name } : null;
     latest = v;
     pushState();
     const n = new Notification({ title: 'Onebox', body: T().updateAvailable.replace('{0}', v) });
-    n.on('click', () => shell.openExternal(RELEASES));
+    n.on('click', () => { showPanel(); if (!settingsOpen) toggleSettings(); });
     n.show();
   } catch { /* offline: try again tomorrow */ }
 }
-ipcMain.on('settings:update', (e) => fromFile(e) && shell.openExternal(RELEASES));
-const settingsPayload = () => ({ settings: S, t: T(), services: services.map(({ id, name }) => ({ id, name })), icons: ICONS, version: app.getVersion(), latest });
+// the running bundle (…/Onebox.app); null when started from source
+const appBundle = () => { const p = path.resolve(process.execPath, '../../..'); return p.endsWith('.app') ? p : null; };
+async function downloadUpdate() {
+  if (!asset || !appBundle() || upd.state === 'downloading') return shell.openExternal(RELEASES);
+  const file = path.join(os.tmpdir(), asset.name);
+  setUpd({ state: 'downloading', pct: 0 });
+  try {
+    const r = await net.fetch(asset.url);
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const total = Number(r.headers.get('content-length')) || 0, hash = crypto.createHash('sha256'), out = fs.createWriteStream(file);
+    let got = 0, last = 0;
+    for await (const chunk of r.body) {
+      hash.update(chunk); got += chunk.length;
+      if (!out.write(chunk)) await new Promise((ok) => out.once('drain', ok));
+      const pct = total ? Math.floor((got / total) * 100) : 0;
+      if (pct >= last + 2) { last = pct; setUpd({ state: 'downloading', pct }); }
+    }
+    await new Promise((ok) => out.end(ok));
+    if (hash.digest('hex') !== asset.sha256) throw new Error('checksum mismatch');
+    setUpd({ state: 'ready', pct: 100, file });
+  } catch (e) {
+    fs.rm(file, () => {});
+    setUpd({ state: 'error', pct: 0 });
+  }
+}
+// Waits for this process to exit, checks the signature of the new app, swaps it in place and reopens it. A failure at any step leaves the old app untouched.
+function installUpdate() {
+  if (upd.state !== 'ready') return;
+  const script = 'while kill -0 "$1" 2>/dev/null; do sleep 0.3; done; M=$(mktemp -d); '
+    + 'if hdiutil attach -nobrowse -readonly -mountpoint "$M" "$2" >/dev/null; then '
+    + 'ditto "$M/Onebox.app" "$3.new" && codesign --verify --deep --strict "$3.new" && rm -rf "$3" && mv "$3.new" "$3" || rm -rf "$3.new"; '
+    + 'hdiutil detach "$M" -quiet; fi; rm -f "$2"; open "$3"';
+  spawn('/bin/sh', ['-c', script, 'sh', String(process.pid), upd.file, appBundle()], { detached: true, stdio: 'ignore' }).unref();
+  app.quit();
+}
+ipcMain.on('settings:update', (e) => fromFile(e) && downloadUpdate());
+ipcMain.on('settings:release', (e) => fromFile(e) && shell.openExternal(RELEASES));
+ipcMain.on('settings:install', (e) => fromFile(e) && installUpdate());
+const settingsPayload = () => ({ settings: S, t: T(), services: services.map(({ id, name }) => ({ id, name })), icons: ICONS, version: app.getVersion(), latest, upd: { state: upd.state, pct: upd.pct }, canInstall: !!(asset && appBundle()) });
 ipcMain.handle('settings:get', (e) => (fromFile(e) ? settingsPayload() : null));
 ipcMain.handle('settings:set', (e, patch) => {
   if (!fromFile(e)) return null;
@@ -297,6 +348,7 @@ function showPanel() {
 }
 
 app.whenReady().then(() => {
+  if (!gotLock) return;
   loadServices();
   loadSettings();
   tray = new Tray(nativeImage.createEmpty());
