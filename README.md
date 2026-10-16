@@ -57,6 +57,14 @@ or **reload** it.
 WhatsApp is always **single-column**: open a chat and the list disappears, like
 any other tab. `Esc` or the **‹ Chat** button brings it back.
 
+**Park files to send.** Drop files on the menu bar icon, or on the dashed slot at
+the top right of the panel: they stack there as a small orange capsule with their
+thumbnails. Open the chat you want and drag the capsule in. It leaves as real
+files, so Mail or Finder take it too. `×` empties the stack.
+
+Tabs may use the microphone, camera and screen sharing (for calls), and downloads go straight to
+`~/Downloads` with a notification.
+
 <br>
 
 ## The icon
@@ -200,7 +208,10 @@ open /Applications/Onebox.app
 
 `build.sh` installs into `/Applications` (`OUT=/some/path/Onebox.app ./build.sh` to put it elsewhere) and packages a real `Onebox.app`: macOS does not show notifications from a
 bare Electron process. It sets the bundle id, hides the Dock icon, builds the
-`.icns` from [`assets/logo.png`](assets/logo.png) and signs ad-hoc.
+`.icns` from [`assets/logo.png`](assets/logo.png) and signs ad-hoc, or with a
+local code-signing certificate named `Onebox Dev` if your keychain has one: then
+the identity stays the same across builds and macOS stops asking again for folder
+access after each rebuild.
 
 If the icon disappears, an icon manager (Ice, Bartender) has put it among the
 hidden ones: drag it out with `Cmd`. The panel then opens at the top right, and a
@@ -215,7 +226,7 @@ global shortcut can be set in the settings.
 - It only works while the app is running. Pushes to a tab that was never loaded are not intercepted.
 - **Gmail** is in the list but hidden: enable it in Settings › Services. It does not work (Google blocks the sign-in, see above). The way around it is IMAP with an app password, or OAuth in the system browser. Not built yet.
 - LinkedIn is view-only: no automation of any kind.
-- The app is signed **ad-hoc**: there is no verified identity behind it. Build it yourself and read the ~400 lines of `main.js`.
+- The app is signed **ad-hoc**: there is no verified identity behind it. Build it yourself and read the ~500 lines of `main.js`.
 - Onebox saves no files by itself and clears the media cache on quit. Chats and logins stay.
 
 <br>

@@ -8,27 +8,88 @@
   #arrow { position: absolute; top: 0; width: 22px; height: 10px; display: none; }
   #arrow path { fill: var(--bar); }
   #shape { position: absolute; top: 10px; left: 0; right: 0; height: 56px; box-sizing: border-box; padding: 6px 8px 18px; display: flex; align-items: center; gap: 6px; background: var(--bar); border-radius: 12px 12px 0 0; -webkit-app-region: drag; }
-  button { -webkit-app-region: no-drag; border: 0; border-radius: 8px; padding: 6px 12px; background: transparent; color: inherit; font: inherit; cursor: pointer; }
-  button:hover, button.on { background: var(--soft); }
+  button { -webkit-app-region: no-drag; white-space: nowrap; border: 0; border-radius: 8px; padding: 6px 12px; background: transparent; color: inherit; font: inherit; cursor: pointer; }
+  button:hover { background: var(--soft); }
+  button.on { background: var(--c, var(--soft)); }
+  button.on[style] { color: #fff; }
+  .park { -webkit-app-region: no-drag; margin-left: auto; position: relative; display: flex; align-items: center; height: 28px; padding: 0 4px 0 34px; border-radius: 14px; background: linear-gradient(135deg, #ffb36b, #ff8a3d); color: #fff; font-size: 12px; font-weight: 600; cursor: grab; box-shadow: 0 3px 10px rgba(255, 138, 61, .35); }
+  .park.new { animation: pop .5s cubic-bezier(.2, .9, .25, 1.3); }
+  .park img { position: absolute; top: -6px; width: 22px; height: 29px; object-fit: cover; object-position: top; border-radius: 3px; border: 1.5px solid #fff; background: #fff; transform: rotate(var(--r)); box-shadow: 0 3px 6px rgba(0, 0, 0, .25); transition: transform .25s cubic-bezier(.2, .9, .25, 1.3); pointer-events: none; }
+  .park:hover img { transform: rotate(calc(var(--r) * 1.6)) translateY(-3px); }
+  .park span { max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .park button { padding: 0 6px; color: #fff; opacity: 0; transition: opacity .15s; }
+  .park:hover button { opacity: .8; }
+  .park button:hover { background: transparent; }
+  .park + .gear, .slot + .gear { margin-left: 0; }
+  /* empty stack: a dashed slot; it pulses while a file is dragged over the panel */
+  .slot { -webkit-app-region: no-drag; margin-left: auto; display: flex; align-items: center; height: 28px; padding: 0 14px; border-radius: 14px; border: 1.5px dashed rgba(255, 154, 82, .6); color: #ff8a3d; background: rgba(255, 154, 82, .08); font-size: 12px; font-weight: 600; white-space: nowrap; }
+  #shape.dragging .slot { border-color: #ff9a52; animation: breathe 1.1s ease-in-out infinite; }
+  #shape.dragging .park { outline: 1.5px dashed #ff9a52; outline-offset: 3px; }
+  #shape.dragging .park::after { content: '+'; position: absolute; right: -7px; top: -7px; width: 16px; height: 16px; border-radius: 50%; background: #fff; color: #ff8a3d; font-size: 14px; line-height: 15px; text-align: center; box-shadow: 0 1px 4px rgba(0, 0, 0, .25); }
+  #shape.over .slot, #shape.over .park { transform: scale(1.08); background: rgba(255, 154, 82, .2); transition: transform .15s; }
+  #shape.over .park { background: linear-gradient(135deg, #ffbf80, #ff9550); }
+  @keyframes breathe { 50% { box-shadow: 0 0 0 4px rgba(255, 154, 82, .18); } }
+  @keyframes pop { from { transform: scale(.5); opacity: 0; } }
   .gear { margin-left: auto; font-size: 26px; line-height: 1; padding: 3px 10px 5px; }
   b { background: #e5484d; color: #fff; border-radius: 9px; padding: 1px 6px; margin-left: 6px; font-size: 11px; }
 </style>
 <svg id="arrow" viewBox="0 0 22 10"><path d="M0 10 L9 2 Q11 0 13 2 L22 10 Z"/></svg>
 <div id="shape"></div>
 <script>
-  tabs.onState(({ list, current, settingsOpen, arrowX, gearTitle }) => {
+  let lastParked = null, selfDrag = false, hintTimer;
+  const shape = document.getElementById('shape');
+  // dragging state, kept on #shape so the state pushes that rebuild the bar don't reset it
+  const dragging = (over) => {
+    if (selfDrag) return;
+    shape.classList.add('dragging');
+    shape.classList.toggle('over', over);
+    clearTimeout(hintTimer);
+    hintTimer = setTimeout(() => shape.classList.remove('dragging', 'over'), 350);
+  };
+  tabs.onDragHint(() => dragging(false));
+  document.addEventListener('dragover', (e) => { if (!e.dataTransfer.types.includes('Files')) return; e.preventDefault(); dragging(true); });
+  document.addEventListener('drop', (e) => { e.preventDefault(); shape.classList.remove('dragging', 'over'); if (e.dataTransfer.files.length) tabs.park(...e.dataTransfer.files); });
+  // a native drag swallows mouse events: the first move after it means the stack's own drag is over
+  document.addEventListener('mousemove', () => { selfDrag = false; });
+  const COLORS = { whatsapp: '#25D366', telegram: '#2AABEE', slack: '#E01E5A', discord: '#5865F2', proton: '#6D4AFF', linkedin: '#0A66C2' };
+  tabs.onState(({ list, current, settingsOpen, arrowX, gearTitle, dropSlot, parked }) => {
     const arrow = document.getElementById('arrow');
     arrow.style.display = arrowX == null ? 'none' : 'block';
     if (arrowX != null) arrow.style.left = `${arrowX - 11}px`;
     document.getElementById('shape').replaceChildren(...list.map((s) => {
       const b = document.createElement('button');
       b.textContent = s.name;
+      if (COLORS[s.id]) b.style.setProperty('--c', COLORS[s.id]);
       if (s.id === current && !settingsOpen) b.className = 'on';
       if (s.unread) { const n = document.createElement('b'); n.textContent = s.unread > 99 ? '99+' : s.unread; b.append(n); }
       b.onclick = () => tabs.select(s.id);
       b.oncontextmenu = (e) => { e.preventDefault(); tabs.menu(s.id); };
       return b;
-    }), (() => {
+    }), ...(parked ? [(() => {
+      const p = document.createElement('div');
+      // the chip is rebuilt on every state push: animate only a newly parked file
+      p.className = parked.at === lastParked ? 'park' : 'park new';
+      lastParked = parked.at;
+      p.draggable = true;
+      p.ondragstart = (e) => { e.preventDefault(); selfDrag = true; tabs.dragParked(); };
+      p.title = parked.tip;
+      // up to three sheets fanned out, the newest on top
+      p.style.paddingLeft = `${28 + 6 * parked.thumbs.length}px`;
+      const imgs = parked.thumbs.map((src, i, a) => {
+        const img = document.createElement('img');
+        img.src = src;
+        img.style.setProperty('--r', `${[-8, 5, -3][a.length - 1 - i]}deg`);
+        img.style.left = `${6 + 6 * i}px`;
+        return img;
+      });
+      const n = document.createElement('span');
+      n.textContent = parked.label;
+      const x = document.createElement('button');
+      x.textContent = '×';
+      x.onclick = () => tabs.unpark();
+      p.append(...imgs, n, x);
+      return p;
+    })()] : [Object.assign(document.createElement('div'), { className: 'slot', textContent: `＋ ${dropSlot}` })]), (() => {
       const g = document.createElement('button');
       g.className = `gear${settingsOpen ? ' on' : ''}`;
       g.title = gearTitle;

@@ -1,4 +1,4 @@
-const { app, BrowserWindow, WebContentsView, Notification, Tray, ipcMain, shell, Menu, nativeTheme, nativeImage, globalShortcut, screen, net } = require('electron');
+const { app, BrowserWindow, WebContentsView, Notification, Tray, ipcMain, shell, Menu, nativeTheme, nativeImage, globalShortcut, screen, net, desktopCapturer } = require('electron');
 const fs = require('fs');
 const os = require('os');
 const crypto = require('crypto');
@@ -7,7 +7,7 @@ const path = require('path');
 const { passes, inQuiet } = require('./filter');
 const STR = require('./i18n');
 
-// Two copies would fight over the same profile (WhatsApp would show its QR code): the second one just opens the panel of the first
+// two copies would fight over one profile (WhatsApp shows its QR): the second just opens the first's panel
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) app.quit();
 app.on('second-instance', () => win && showPanel());
@@ -34,6 +34,8 @@ const major = process.versions.chrome.split('.')[0];
 const CH_UA = `"Chromium";v="${major}", "Google Chrome";v="${major}", "Not;A=Brand";v="8"`;
 
 let win, bar, tray, settingsView, servicesFile, current, settingsOpen = false, arrowX = null;
+let parked = [], parkedIcon = null, parkedAt = 0; // files dropped on the tray icon, stacked until dragged into a chat
+let halo, haloTimer; // "drop here" pill under the icon while a file is dragged over it
 const services = [];
 const views = {}; // service id -> WebContentsView
 const unread = {};
@@ -84,9 +86,8 @@ function applySettings() {
   pushState();
 }
 
-// Clears Cache Storage, where seen photos and files end up (WhatsApp: lru-media-array-buffer-cache).
-// The HTTP cache stays: it holds each site's own code, and wiping it made WhatsApp re-download
-// ~10 MB and start ~3 s slower every time (measured 15/10). IndexedDB stays too: it keeps the logins.
+// Clears Cache Storage (seen photos and files). The HTTP cache holds each site's code: wiping it cost
+// WhatsApp ~10 MB and ~8 s per start. IndexedDB holds the logins.
 const clearCaches = () => Promise.all(Object.values(views).map((v) =>
   v.webContents.session.clearStorageData({ storages: ['cachestorage'] })));
 let cleaned = false;
@@ -171,16 +172,20 @@ function loadServices() {
   }
 }
 
-// The arrow points at the icon, not at the middle of the tray item (which includes the count). Measured: icon at x+21, or x+23 when the item is wider than 50 (count shown).
+// The arrow points at the cube, not the item's centre. Measured: x+21, x+23 when the count widens it past 50.
 const arrowFor = (t, winX) => Math.min(Math.max(Math.round(t.x + (t.width > 50 ? 23 : 21) - winX), R + 12), win.getSize()[0] - R - 12);
 
 function pushState() {
   if (win?.isVisible() && arrowX != null) arrowX = arrowFor(tray.getBounds(), win.getPosition()[0]); // the count changes the item width
   // a muted service counts neither on its tab nor next to the icon
   const list = visible().map((s) => ({ id: s.id, name: s.name, unread: S.muted.includes(s.id) ? 0 : unread[s.id] || 0 }));
-  bar.webContents.send('state', { current, settingsOpen, arrowX, list, gearTitle: T().settings });
+  bar.webContents.send('state', { current, settingsOpen, arrowX, list, gearTitle: T().settings, dropSlot: T().dropSlot, parked: parked.length ? {
+    label: parked.length > 1 ? T().nFiles.replace('{0}', parked.length) : parked[0].name,
+    tip: parked.map((f) => [f.name, f.info].filter(Boolean).join(' · ')).join('\n'),
+    thumbs: parked.slice(-3).map((f) => f.thumb), at: parkedAt,
+  } : null });
   const total = list.reduce((a, s) => a + s.unread, 0);
-  // next to the icon: with an update waiting (and updateBadge on) the new version replaces the count, which would read like part of it
+  // a waiting update replaces the count: side by side they read as one number
   if (!animating) tray.setImage(restIcon());
   tray.setTitle(latest && S.updateBadge ? ` ↑${latest}` : S.showCount && total ? ` ${total}` : '');
 }
@@ -222,8 +227,26 @@ function addService(svc) {
     h['sec-ch-ua'] = CH_UA;
     cb({ requestHeaders: h });
   });
-  // only notifications; camera, microphone, location etc. denied
-  wc.session.setPermissionRequestHandler((_w, perm, cb) => cb(perm === 'notifications'));
+  // calls, copy buttons and video fullscreen work; reading the clipboard, location etc. denied
+  const ALLOW = ['notifications', 'media', 'display-capture', 'clipboard-sanitized-write', 'fullscreen'];
+  wc.session.setPermissionRequestHandler((_w, perm, cb) => cb(ALLOW.includes(perm)));
+  // screen sharing: macOS 15+ shows its own picker; older systems share the main screen
+  wc.session.setDisplayMediaRequestHandler((_req, cb) => {
+    desktopCapturer.getSources({ types: ['screen'] }).then((s) => cb({ video: s[0] }), () => cb({}));
+  }, { useSystemPicker: true });
+  // a Save dialog would hang off the hidden panel: save straight to Downloads
+  wc.session.on('will-download', (_e, item) => {
+    const dir = app.getPath('downloads'), ext = path.extname(item.getFilename()), base = path.basename(item.getFilename(), ext);
+    let file = path.join(dir, item.getFilename());
+    for (let i = 1; fs.existsSync(file); i++) file = path.join(dir, `${base} (${i})${ext}`);
+    item.setSavePath(file);
+    item.once('done', (_e, state) => {
+      if (state !== 'completed') return;
+      const n = new Notification({ title: 'Onebox', body: T().downloaded.replace('{0}', path.basename(file)) });
+      n.on('click', () => shell.showItemInFolder(file));
+      n.show();
+    });
+  });
   wc.setWindowOpenHandler(({ url }) => {
     if (/^https?:/.test(url)) shell.openExternal(url);
     return { action: 'deny' };
@@ -245,6 +268,11 @@ function addService(svc) {
 
 ipcMain.on('select', (_e, id) => views[id] && select(id));
 ipcMain.on('gear', toggleSettings);
+// the stack leaves as real files, so any target takes it: a chat, Mail, Finder
+ipcMain.on('park-drag', (e) => parked.length && e.sender === bar.webContents && e.sender.startDrag({ file: parked[0].path, files: parked.map((f) => f.path), icon: parkedIcon }));
+ipcMain.on('park-files', (e, paths) => e.sender === bar.webContents && parkFiles(paths.filter((f) => typeof f === 'string' && f && fs.existsSync(f))));
+ipcMain.on('drag-hint', (e) => Object.values(views).some((v) => v.webContents === e.sender) && bar.webContents.send('drag-hint'));
+ipcMain.on('unpark', (e) => { if (e.sender === bar.webContents) { parked = []; pushState(); } });
 // "‹ Chat" button in single-column mode: same as Esc, which closes the open chat
 ipcMain.on('wa-back', (e) => {
   if (e.sender !== waWc) return;
@@ -262,9 +290,9 @@ ipcMain.on('tab-menu', (e, id) => {
     { label: T().reload, click: () => views[id].webContents.reload() },
   ]).popup({ window: win });
 });
-// Update check: asks GitHub for the latest release once a day. Downloading and installing only happen when the user presses the button.
+// Update check: GitHub's latest release, once a day. Download and install only on the button.
 const RELEASES = 'https://github.com/stek765/OneBox/releases/latest';
-// ONEBOX_UPDATE_API points the check at a local feed, to test an update end to end without publishing one
+// ONEBOX_UPDATE_API: a local feed, to test an update without publishing one
 const API = process.env.ONEBOX_UPDATE_API || 'https://api.github.com/repos/stek765/OneBox/releases/latest';
 const TRUSTED = process.env.ONEBOX_UPDATE_API ? /^(https:\/\/github\.com\/stek765\/OneBox\/|http:\/\/127\.0\.0\.1:)/ : /^https:\/\/github\.com\/stek765\/OneBox\//;
 let latest = null, asset = null;
@@ -316,13 +344,13 @@ async function downloadUpdate() {
     setUpd({ state: 'error', pct: 0 });
   }
 }
-// Waits for this process to exit, checks the signature of the new app, swaps it in place and reopens it. A failure at any step leaves the old app untouched.
+// After exit: verify the new app, swap it in, reopen. Any failure leaves the old app untouched.
 function installUpdate() {
   if (upd.state !== 'ready') return;
   const swap = 'codesign --verify --deep --strict "$3.new" && rm -rf "$3" && mv "$3.new" "$3" || rm -rf "$3.new"; ';
   const script = 'while kill -0 "$1" 2>/dev/null; do sleep 0.3; done; '
     + (upd.kind === 'app'
-      // new code into a copy of this app; changing the bundle breaks its ad-hoc signature, so it is signed again like build.sh does
+      // new code into a copy of this app, then re-sign: editing the bundle breaks the signature
       ? 'ditto "$3" "$3.new" && rm -rf "$3.new/Contents/Resources/app" && ditto -x -k "$2" "$3.new/Contents/Resources" && codesign --force --deep --sign - "$3.new" && ' + swap
       : 'M=$(mktemp -d); if hdiutil attach -nobrowse -readonly -mountpoint "$M" "$2" >/dev/null; then ditto "$M/Onebox.app" "$3.new" && ' + swap + 'hdiutil detach "$M" -quiet; fi; ')
     + 'rm -f "$2"; open "$3"';
@@ -350,6 +378,61 @@ ipcMain.on('notify', (e, title, body) => {
   n.show();
 });
 
+const HALO = `<style>
+  html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; }
+  .p { position: absolute; left: 50%; top: 8px; transform: translateX(-50%); display: flex; align-items: center; gap: 8px; padding: 9px 16px 9px 12px; border-radius: 15px;
+    background: linear-gradient(135deg, #ffb36b, #ff8a3d); color: #fff; font: 600 13px -apple-system, sans-serif; white-space: nowrap;
+    box-shadow: 0 8px 24px rgba(255, 138, 61, .45), inset 0 0 0 1px rgba(255, 255, 255, .35);
+    animation: in .38s cubic-bezier(.2, .9, .25, 1.25) both, glow 1.2s ease-in-out .4s infinite; }
+  .p::before { content: ''; position: absolute; left: 50%; top: -5px; width: 11px; height: 11px; margin-left: -5px; background: #ffad62; transform: rotate(45deg); border-radius: 2px; }
+  .a { display: inline-block; font-size: 15px; animation: bob .9s ease-in-out infinite; }
+  body.in .p { animation: out .24s ease-in forwards; }
+  @keyframes in { from { opacity: 0; transform: translate(-50%, -14px) scale(.7); } }
+  @keyframes out { to { opacity: 0; transform: translate(-50%, -26px) scale(.25); } }
+  @keyframes glow { 50% { box-shadow: 0 8px 34px rgba(255, 138, 61, .8), inset 0 0 0 1px rgba(255, 255, 255, .55); } }
+  @keyframes bob { 50% { transform: translateY(-3px); } }
+</style><div class="p"><span class="a">↑</span>{0}</div>`;
+
+function showHalo() {
+  clearTimeout(haloTimer);
+  if (halo?.isVisible()) return;
+  const t = tray.getBounds();
+  if (t.x < 0 || t.width === 0) return; // icon hidden by the system or Ice: nowhere to point
+  if (!halo) {
+    halo = new BrowserWindow({ width: 260, height: 70, show: false, frame: false, transparent: true, resizable: false, focusable: false, skipTaskbar: true, alwaysOnTop: true, hasShadow: false, webPreferences: { sandbox: true } });
+    halo.setIgnoreMouseEvents(true);
+  }
+  halo.setPosition(Math.round(t.x + (t.width > 50 ? 23 : 21) - 130), t.y + t.height);
+  halo.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(HALO.replace('{0}', T().dropHere))}`);
+  halo.showInactive();
+  if (!animating) tray.setImage(nativeImage.createFromPath(path.join(__dirname, 'assets', `${S.icon}-orange@2x.png`)));
+}
+
+// absorb = the file was dropped: the pill shrinks into the icon instead of just vanishing
+function hideHalo(absorb) {
+  clearTimeout(haloTimer);
+  if (!animating) tray.setImage(restIcon());
+  if (!halo?.isVisible()) return;
+  if (!absorb) return halo.hide();
+  halo.webContents.executeJavaScript("document.body.className = 'in'").catch(() => {});
+  setTimeout(() => halo.hide(), 250);
+}
+
+async function parkFiles(files) {
+  // startDrag needs the icon ready, so it is made here
+  for (const file of files) {
+    if (parked.some((f) => f.path === file)) continue;
+    // Quick Look thumbnail (a PDF's first page, the photo), else the Finder icon
+    const img = await nativeImage.createThumbnailFromPath(file, { width: 120, height: 120 }).catch(() => app.getFileIcon(file, { size: 'large' }));
+    const st = fs.statSync(file), ext = path.extname(file).slice(1).toUpperCase();
+    const kb = st.size / 1024, size = kb < 1024 ? `${Math.max(1, Math.round(kb))} KB` : `${(kb / 1024).toFixed(1)} MB`;
+    parked.push({ path: file, name: path.basename(file), info: st.isDirectory() ? '' : [ext, size].filter(Boolean).join(' · '), thumb: img.toDataURL() });
+    parkedIcon = img.resize({ width: 64 });
+  }
+  parkedAt = Date.now();
+  showPanel();
+}
+
 // The panel drops below the menu bar icon
 function showPanel() {
   const t = tray.getBounds();
@@ -375,6 +458,15 @@ app.whenReady().then(() => {
   tray = new Tray(nativeImage.createEmpty());
   tray.setToolTip('Onebox');
   tray.on('click', togglePanel);
+  tray.on('drag-enter', showHalo);
+  // the icon is a few points wide: enter/leave fire on every wobble, so leave only after a pause
+  tray.on('drag-leave', () => { clearTimeout(haloTimer); haloTimer = setTimeout(() => hideHalo(false), 250); });
+  tray.on('drag-end', () => hideHalo(false));
+  tray.on('drop-files', (_e, files) => {
+    hideHalo(true);
+    playTray(PULSE_FRAMES, 130);
+    parkFiles(files);
+  });
   tray.on('right-click', () => tray.popUpContextMenu(Menu.buildFromTemplate([
     { label: T().openSettings, click: () => { showPanel(); if (!settingsOpen) toggleSettings(); } },
     { label: T().editServices, click: () => shell.openPath(servicesFile) },
@@ -391,7 +483,7 @@ app.whenReady().then(() => {
   settingsView = new WebContentsView({ webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, sandbox: true } });
   settingsView.webContents.loadFile(path.join(__dirname, 'settings.html'));
   settingsView.setBorderRadius(R);
-  win.contentView.addChildView(settingsView); // sopra le schede dei servizi
+  win.contentView.addChildView(settingsView); // above the service tabs
   settingsView.setVisible(false);
   bar.setBackgroundColor('#00000000');
   win.on('resize', layout);

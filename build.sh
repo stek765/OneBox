@@ -24,5 +24,7 @@ for s in 16 32 128 256 512; do
   sips -z $((s * 2)) $((s * 2)) assets/logo.png --out "$ICONSET/icon_${s}x${s}@2x.png" >/dev/null
 done
 iconutil -c icns "$ICONSET" -o "$OUT/Contents/Resources/electron.icns"
-codesign --force --deep --sign - "$OUT"
+# a local "Onebox Dev" certificate keeps one identity across builds, so macOS remembers folder permissions
+ID=-; security find-identity -p codesigning | grep -q '"Onebox Dev"' && ID="Onebox Dev"
+codesign --force --deep --sign "$ID" "$OUT"
 echo "ok: $OUT"

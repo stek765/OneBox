@@ -1,4 +1,4 @@
-const { contextBridge, ipcRenderer, webFrame } = require('electron');
+const { contextBridge, ipcRenderer, webFrame, webUtils } = require('electron');
 
 if (location.protocol === 'file:') {
   // tab bar and settings pages
@@ -7,6 +7,10 @@ if (location.protocol === 'file:') {
     select: (id) => ipcRenderer.send('select', id),
     gear: () => ipcRenderer.send('gear'),
     menu: (id) => ipcRenderer.send('tab-menu', id),
+    dragParked: () => ipcRenderer.send('park-drag'),
+    unpark: () => ipcRenderer.send('unpark'),
+    park: (...files) => ipcRenderer.send('park-files', files.map((f) => webUtils.getPathForFile(f))),
+    onDragHint: (cb) => ipcRenderer.on('drag-hint', cb),
   });
   contextBridge.exposeInMainWorld('settings', {
     get: () => ipcRenderer.invoke('settings:get'),
@@ -19,6 +23,13 @@ if (location.protocol === 'file:') {
     onOpen: (cb) => ipcRenderer.on('open', cb),
   });
 } else {
+  // a file dragged over the page: tell the tab bar, which shows where it can be parked
+  let hinted = 0;
+  window.addEventListener('dragover', (e) => {
+    if (!e.dataTransfer?.types.includes('Files') || Date.now() - hinted < 100) return;
+    hinted = Date.now();
+    ipcRenderer.send('drag-hint');
+  }, true);
   // service page: web notifications are routed through here so they can be filtered
   contextBridge.exposeInMainWorld('__inbox', {
     back: () => ipcRenderer.send('wa-back'),
