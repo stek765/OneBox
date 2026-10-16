@@ -308,10 +308,13 @@ async function checkUpdate() {
     // a file and its sha256 as GitHub reports them; without a digest we only point to the release page
     const ok = (x) => x && /^sha256:[0-9a-f]{64}$/.test(x.digest || '') && TRUSTED.test(x.browser_download_url);
     const pick = (x, kind) => ({ url: x.browser_download_url, sha256: x.digest.slice(7), name: x.name, kind });
-    // same Electron as ours: only Onebox's own code is needed (~50 KB) instead of the whole dmg (~130 MB)
-    const zip = (rel.assets || []).find((x) => x.name === `Onebox-app-${v}-electron${process.versions.electron}.zip`);
+    // same Electron as ours: the bundle minus Electron (~300 KB) instead of the whole dmg (~130 MB)
+    const find = (n) => (rel.assets || []).find((x) => x.name === n), E = process.versions.electron;
+    const signed = find(`Onebox-signed-${v}-electron${E}.zip`), zip = find(`Onebox-app-${v}-electron${E}.zip`);
     const dmg = (rel.assets || []).find((x) => /-arm64\.dmg$/.test(x.name));
-    asset = ok(zip) ? pick(zip, 'app') : ok(dmg) ? pick(dmg, 'dmg') : null;
+    // signed parts keep a certificate-signed app's identity (macOS keeps its permissions);
+    // an ad-hoc app takes the dmg once to get that identity
+    asset = ok(signed) && (await certSigned()) ? pick(signed, 'signed') : ok(zip) && !ok(signed) ? pick(zip, 'app') : ok(dmg) ? pick(dmg, 'dmg') : null;
     latest = v;
     pushState();
     const n = new Notification({ title: 'Onebox', body: T().updateAvailable.replace('{0}', v) });
@@ -321,6 +324,7 @@ async function checkUpdate() {
 }
 // the running bundle (…/Onebox.app); null when started from source
 const appBundle = () => { const p = path.resolve(process.execPath, '../../..'); return p.endsWith('.app') ? p : null; };
+const certSigned = () => new Promise((ok) => (appBundle() ? execFile('codesign', ['-dr', '-', appBundle()], (_e, out, err) => ok(/certificate leaf/.test(out + err))) : ok(false)));
 async function downloadUpdate() {
   if (!asset || !appBundle() || upd.state === 'downloading') return shell.openExternal(RELEASES);
   const file = path.join(os.tmpdir(), asset.name);
@@ -349,7 +353,10 @@ function installUpdate() {
   if (upd.state !== 'ready') return;
   const swap = 'codesign --verify --deep --strict "$3.new" && rm -rf "$3" && mv "$3.new" "$3" || rm -rf "$3.new"; ';
   const script = 'while kill -0 "$1" 2>/dev/null; do sleep 0.3; done; '
-    + (upd.kind === 'app'
+    + (upd.kind === 'signed'
+      // the signed parts over a copy; should they not match this Electron, fall back to ad-hoc rather than fail
+      ? 'ditto "$3" "$3.new" && rm -rf "$3.new/Contents/Resources/app" && ditto -x -k "$2" "$3.new" && { codesign --verify --deep --strict "$3.new" 2>/dev/null || codesign --force --deep --sign - "$3.new"; } && ' + swap
+      : upd.kind === 'app'
       // new code into a copy of this app, then re-sign: editing the bundle breaks the signature
       ? 'ditto "$3" "$3.new" && rm -rf "$3.new/Contents/Resources/app" && ditto -x -k "$2" "$3.new/Contents/Resources" && codesign --force --deep --sign - "$3.new" && ' + swap
       : 'M=$(mktemp -d); if hdiutil attach -nobrowse -readonly -mountpoint "$M" "$2" >/dev/null; then ditto "$M/Onebox.app" "$3.new" && ' + swap + 'hdiutil detach "$M" -quiet; fi; ')
