@@ -1,8 +1,10 @@
 {
   "name": "onebox",
-  "version": "0.3.8",
+  "version": "0.3.9",
   "private": true,
   "main": "main.js",
   "license": "MIT",
-  "devDependencies": { "electron": "43.3.0" }
+  "devDependencies": {
+    "electron": "43.3.0"
+  }
 }
