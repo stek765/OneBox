@@ -79,8 +79,8 @@ function applySettings() {
   if (S.shortcut) globalShortcut.register(S.shortcut, togglePanel);
   for (const [id, v] of Object.entries(views)) {
     v.webContents.setZoomFactor(S.zoom);
-    v.webContents.setAudioMuted(S.muted.includes(id));
   }
+  applyAudio();
   if (S.hidden.includes(current)) select(visible()[0].id); // the open tab was just hidden
   if (win.getSize()[0] !== S.width) { win.setSize(S.width, win.getSize()[1]); if (win.isVisible()) showPanel(); }
   pushState();
@@ -204,7 +204,14 @@ function select(id) {
   settingsOpen = false;
   settingsView.setVisible(false);
   for (const [k, v] of Object.entries(views)) v.setVisible(k === id);
+  applyAudio();
   pushState();
+}
+
+// a muted service stays silent in the background, but the tab in front of you plays (videos, voice notes)
+function applyAudio() {
+  const open = win?.isVisible();
+  for (const [id, v] of Object.entries(views)) v.webContents.setAudioMuted(S.muted.includes(id) && !(open && id === current));
 }
 
 function addService(svc) {
@@ -257,7 +264,7 @@ function addService(svc) {
     unread[svc.id] = m ? Number(m[1]) : 0;
     pushState();
   });
-  wc.setAudioMuted(S.muted.includes(svc.id));
+  wc.setAudioMuted(S.muted.includes(svc.id) && !(win?.isVisible() && svc.id === current));
   // web apps are wide: zoom out to fit the columns. Reapplied on every navigation, Chromium resets it
   for (const ev of ['dom-ready', 'did-finish-load', 'did-navigate', 'did-navigate-in-page']) wc.on(ev, () => wc.setZoomFactor(S.zoom));
   if (new URL(svc.url).hostname === 'web.whatsapp.com') waWc = wc;
@@ -493,6 +500,8 @@ app.whenReady().then(() => {
   win.contentView.addChildView(settingsView); // above the service tabs
   settingsView.setVisible(false);
   bar.setBackgroundColor('#00000000');
+  win.on('show', applyAudio);
+  win.on('hide', applyAudio);
   win.on('resize', layout);
   win.on('resized', () => { S.width = win.getSize()[0]; fs.writeFileSync(setFile(), JSON.stringify(S, null, 2)); }); // remember a dragged width
   layout();
