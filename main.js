@@ -10,7 +10,9 @@ const STR = require('./i18n');
 // two copies would fight over one profile (WhatsApp shows its QR): the second just opens the first's panel
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) app.quit();
-app.on('second-instance', () => win && showPanel());
+// other apps can bring a tab to the front: open -n -a Onebox --args --open=whatsapp
+const asked = (argv) => visible().find((s) => argv.includes(`--open=${s.id}`))?.id;
+app.on('second-instance', (_e, argv) => { if (!win) return; const id = asked(argv); if (id) select(id); showPanel(); });
 
 // Default services, copied to services.json on first run. allow/deny are case-insensitive regexes tested on "title\nbody".
 const DEFAULTS = [
@@ -511,6 +513,6 @@ app.whenReady().then(() => {
   playTray(START_FRAMES, 140); // build-up animation at launch
   checkUpdate();
   setInterval(checkUpdate, 24 * 3600 * 1000);
-  bar.webContents.once('did-finish-load', () => { select(visible()[0].id); showPanel(); if (process.argv.includes('--settings')) toggleSettings(); });
+  bar.webContents.once('did-finish-load', () => { select(asked(process.argv) ?? visible()[0].id); showPanel(); if (process.argv.includes('--settings')) toggleSettings(); });
   app.on('will-quit', () => globalShortcut.unregisterAll());
 });
