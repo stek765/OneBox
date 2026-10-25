@@ -459,7 +459,9 @@ function showPanel() {
   arrowX = hidden ? null : arrowFor(t, x);
   win.setSize(w, Math.min(h, workArea.height - 16));
   pushState();
+  win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true }); // else it snaps back to whatever Space it last showed on
   win.show();
+  win.setVisibleOnAllWorkspaces(false);
   app.focus({ steal: true });
   // the icon bounds settle after the click: recompute the arrow
   for (const ms of [80, 300]) setTimeout(() => win.isVisible() && pushState(), ms);
