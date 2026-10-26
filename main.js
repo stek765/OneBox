@@ -461,9 +461,7 @@ function showPanel() {
   arrowX = hidden ? null : arrowFor(t, x);
   win.setSize(w, Math.min(h, workArea.height - 16));
   pushState();
-  win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true }); // else it snaps back to whatever Space it last showed on
   win.show();
-  win.setVisibleOnAllWorkspaces(false);
   app.focus({ steal: true });
   // the icon bounds settle after the click: recompute the arrow
   for (const ms of [80, 300]) setTimeout(() => win.isVisible() && pushState(), ms);
@@ -493,6 +491,7 @@ app.whenReady().then(() => {
   ])));
 
   win = new BrowserWindow({ width: S.width, height: 780, show: false, frame: false, resizable: true, fullscreenable: false, skipTaskbar: true, alwaysOnTop: true, transparent: true, backgroundColor: '#00000000', hasShadow: true });
+  win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true }); // once, at creation: follows you to whatever Space you open it from. Toggling this on/off around every show() corrupted the window's buffer (v0.3.10 regression)
   win.on('blur', () => S.closeOnBlur && hideUnlessDrop()); // click outside closes it
   bar = new WebContentsView({ webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, sandbox: true } });
   bar.webContents.loadFile(path.join(__dirname, 'tabs.html'));
