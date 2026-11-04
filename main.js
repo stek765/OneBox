@@ -409,16 +409,22 @@ const HALO = `<style>
   @keyframes bob { 50% { transform: translateY(-3px); } }
 </style><div class="p"><span class="a">↑</span>{0}</div>`;
 
+// Space while a file hovers the icon opens the panel, like spring-loaded folders in Finder.
+// Space is taken globally only for that moment, and handed back on leave, drop or end.
+const springOn = () => !globalShortcut.isRegistered('Space') && globalShortcut.register('Space', () => { springOff(); hideHalo(false); showPanel(); });
+const springOff = () => globalShortcut.isRegistered('Space') && globalShortcut.unregister('Space');
+
 function showHalo() {
   clearTimeout(haloTimer);
+  springOn();
   if (halo?.isVisible()) return;
   const t = tray.getBounds();
   if (t.x < 0 || t.width === 0) return; // icon hidden by the system or Ice: nowhere to point
   if (!halo) {
-    halo = new BrowserWindow({ width: 260, height: 70, show: false, frame: false, transparent: true, resizable: false, focusable: false, skipTaskbar: true, alwaysOnTop: true, hasShadow: false, webPreferences: { sandbox: true } });
+    halo = new BrowserWindow({ width: 340, height: 70, show: false, frame: false, transparent: true, resizable: false, focusable: false, skipTaskbar: true, alwaysOnTop: true, hasShadow: false, webPreferences: { sandbox: true } });
     halo.setIgnoreMouseEvents(true);
   }
-  halo.setPosition(Math.round(t.x + (t.width > 50 ? 23 : 21) - 130), t.y + t.height);
+  halo.setPosition(Math.round(t.x + (t.width > 50 ? 23 : 21) - 170), t.y + t.height);
   halo.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(HALO.replace('{0}', T().dropHere))}`);
   halo.showInactive();
   if (!animating) tray.setImage(nativeImage.createFromPath(path.join(__dirname, 'assets', `${S.icon}-orange@2x.png`)));
@@ -427,6 +433,7 @@ function showHalo() {
 // absorb = the file was dropped: the pill shrinks into the icon instead of just vanishing
 function hideHalo(absorb) {
   clearTimeout(haloTimer);
+  springOff();
   if (!animating) tray.setImage(restIcon());
   if (!halo?.isVisible()) return;
   if (!absorb) return halo.hide();
