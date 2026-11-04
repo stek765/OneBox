@@ -7,6 +7,7 @@ if (location.protocol === 'file:') {
     select: (id) => ipcRenderer.send('select', id),
     gear: () => ipcRenderer.send('gear'),
     menu: (id) => ipcRenderer.send('tab-menu', id),
+    reorder: (ids) => ipcRenderer.send('reorder', ids),
     dragParked: () => ipcRenderer.send('park-drag'),
     unpark: () => ipcRenderer.send('unpark'),
     park: (...files) => ipcRenderer.send('park-files', files.map((f) => webUtils.getPathForFile(f))),

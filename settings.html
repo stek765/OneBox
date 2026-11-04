@@ -23,6 +23,12 @@
   .ico img { width: 18px; height: 18px; }
   @media (prefers-color-scheme: dark) { .ico img { filter: invert(1); } }
   .ico.on img { filter: invert(1); }
+  /* the tab colour: a swatch that opens a palette under the row (the macOS picker is a separate window: the panel would close on blur) */
+  .pick { display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 10px; opacity: .9; }
+  .dot { width: 22px; height: 22px; padding: 0; border-radius: 6px; border: 2px solid var(--bg); box-shadow: 0 0 0 1px var(--line); }
+  .dot:hover { transform: scale(1.12); background: var(--c); }
+  .dot.cur { box-shadow: 0 0 0 2px var(--text); }
+  .palette { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; align-items: center; padding: 8px 0 10px; border-bottom: 1px solid var(--line); }
   input[type=time] { font: inherit; color: inherit; background: transparent; border: 1px solid var(--line); border-radius: 7px; padding: 3px 6px; }
   small { opacity: .6; display: block; margin-top: 2px; }
   /* full width, flush with the bottom: the dusk colours of the README screenshots, a bit lighter */
@@ -42,12 +48,36 @@
   const row = (label, ctrl, hint) => { const r = el('div', 'row'); const l = el('div'); l.append(el('span', '', label)); if (hint) l.append(el('small', '', hint)); r.append(l, ctrl); return r; };
 
   const toggle = (caption, on, fn) => { const w = el('label'); w.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:3px;font-size:10px;opacity:.9'; w.append(sw(on, fn), el('span', '', caption)); return w; };
+  const PALETTE = ['#25D366', '#84CC16', '#EAB308', '#F97316', '#EF4444', '#E01E5A', '#D946EF', '#A855F7', '#6D4AFF', '#5865F2', '#0A66C2', '#2AABEE', '#14B8A6', '#64748B'];
+  let picking = null; // service whose palette is open
+  const dot = (c, cls) => { const b = el('button', `dot${cls ? ` ${cls}` : ''}`); b.style.background = c; b.style.setProperty('--c', c); return b; };
+  const colorCtl = (s) => {
+    const w = el('div', 'pick'), b = dot(s.color);
+    b.onclick = () => { picking = picking === s.id ? null : s.id; render(); };
+    w.append(b, el('span', '', t.color));
+    return w;
+  };
+  const palette = (s) => {
+    const d = el('div', 'palette');
+    for (const c of PALETTE) {
+      const b = dot(c, c.toLowerCase() === s.color.toLowerCase() ? 'cur' : '');
+      b.onclick = () => { picking = null; set({ colors: { ...S.colors, [s.id]: c } }); };
+      d.append(b);
+    }
+    if (s.custom) {
+      const r = el('button', '', `↺ ${t.resetColor}`);
+      r.onclick = () => { picking = null; const { [s.id]: _, ...rest } = S.colors; set({ colors: rest }); };
+      d.append(r);
+    }
+    return d;
+  };
   const serviceCtl = (s) => {
     const hidden = S.hidden.includes(s.id), muted = S.muted.includes(s.id);
     const d = el('div', 'opts'); d.style.gap = '16px';
     d.append(
       toggle(t.visible, !hidden, () => set({ hidden: hidden ? S.hidden.filter((x) => x !== s.id) : [...S.hidden, s.id] })),
       toggle(t.notifications, !muted, () => set({ muted: muted ? S.muted.filter((x) => x !== s.id) : [...S.muted, s.id] })),
+      colorCtl(s),
     );
     return d;
   };
@@ -102,7 +132,7 @@
       row(t.quiet, quietCtl, t.quietHint),
       el('h3', '', t.secServices),
       el('small', '', t.servicesHint),
-      ...SV.map((s) => row(s.name, serviceCtl(s))),
+      ...SV.flatMap((s) => [row(s.name, serviceCtl(s)), ...(picking === s.id ? [palette(s)] : [])]),
       el('h3', '', t.secGeneral),
       row(t.language, opts(LANGS, S.lang, 'lang')),
       row(t.login, sw(S.launchAtLogin, () => set({ launchAtLogin: !S.launchAtLogin }))),

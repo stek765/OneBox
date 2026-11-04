@@ -3,7 +3,7 @@ module.exports = {
   en: {
     settings: 'Settings', tagline: 'All your messages, one place', quit: 'Quit', quitTitle: 'Quit Onebox',
     none: 'None', space: '⌃⌥Space', narrow: 'Narrow', medium: 'Medium', wide: 'Wide',
-    system: 'System', light: 'Light', dark: 'Dark',
+    system: 'System', light: 'Light', dark: 'Dark', resetColor: 'Back to the original colour', color: 'Colour',
     secLook: 'Appearance', theme: 'Theme', width: 'Panel width', widthHint: 'You can also drag the panel edge',
     zoom: 'Page zoom', zoomHint: 'Lower = more content fits (handy for WhatsApp)',
     icon: 'Menu bar icon', animate: 'Icon animation', animateHint: 'Cube icon only: lights up at launch and on every message that passes the filters',
@@ -23,7 +23,7 @@ module.exports = {
   it: {
     settings: 'Impostazioni', tagline: 'Tutti i messaggi, un solo posto', quit: 'Esci', quitTitle: 'Esci da Onebox',
     none: 'Nessuna', space: '⌃⌥Spazio', narrow: 'Stretto', medium: 'Medio', wide: 'Largo',
-    system: 'Sistema', light: 'Chiaro', dark: 'Scuro',
+    system: 'Sistema', light: 'Chiaro', dark: 'Scuro', resetColor: 'Torna al colore originale', color: 'Colore',
     secLook: 'Aspetto', theme: 'Tema', width: 'Larghezza del pannello', widthHint: 'Puoi anche trascinare il bordo del pannello',
     zoom: 'Zoom delle pagine', zoomHint: 'Più basso = ci sta più contenuto (utile per WhatsApp)',
     icon: 'Icona nella barra dei menu', animate: 'Animazione dell’icona', animateHint: 'Solo con l’icona Cubo: si accende all’avvio e a ogni messaggio che passa i filtri',

@@ -1,18 +1,20 @@
 <!doctype html>
 <meta charset="utf-8">
 <style>
-  :root { color-scheme: light dark; --bar: #f2f3f8; --text: #1d1f2b; --soft: rgba(60, 70, 120, .12); }
-  @media (prefers-color-scheme: dark) { :root { --bar: #191b2a; --text: #e8ebf7; --soft: rgba(160, 175, 235, .16); } }
+  /* the bar is dark in both themes (it was chosen that way); --bar is its top, where the arrow is painted */
+  :root { color-scheme: dark; --bar: #23232b; --bar2: #1b1b21; --text: #e8ebf7; --soft: rgba(255, 255, 255, .08); }
   html, body { margin: 0; height: 100%; background: transparent; }
   body { position: relative; font: 13px -apple-system, sans-serif; color: var(--text); user-select: none; }
   #arrow { position: absolute; top: 0; width: 22px; height: 10px; display: none; }
+  /* below the bar the same dark goes on to the bottom: the frame around the page */
+  #frame { position: absolute; top: 69px; left: 0; right: 0; bottom: 0; background: var(--bar2); border-radius: 0 0 12px 12px; }
   #arrow path { fill: var(--bar); }
-  #shape { position: absolute; top: 10px; left: 0; right: 0; height: 56px; box-sizing: border-box; padding: 6px 8px 18px; display: flex; align-items: center; gap: 6px; background: var(--bar); border-radius: 12px 12px 0 0; -webkit-app-region: drag; }
-  button { -webkit-app-region: no-drag; white-space: nowrap; border: 0; border-radius: 8px; padding: 6px 12px; background: transparent; color: inherit; font: inherit; cursor: pointer; }
+  #shape { position: absolute; top: 10px; left: 0; right: 0; height: 60px; box-sizing: border-box; padding: 2px 10px 14px; display: flex; align-items: center; gap: 6px; background: linear-gradient(to bottom, var(--bar), var(--bar2) 80%); border-radius: 12px 12px 0 0; }
+  button { white-space: nowrap; border: 0; border-radius: 8px; padding: 6px 12px; background: transparent; color: inherit; font: inherit; cursor: pointer; }
   button:hover { background: var(--soft); }
   button.on { background: var(--c, var(--soft)); }
   button.on[style] { color: #fff; }
-  .park { -webkit-app-region: no-drag; margin-left: auto; position: relative; display: flex; align-items: center; height: 28px; padding: 0 4px 0 34px; border-radius: 14px; background: linear-gradient(135deg, #ffb36b, #ff8a3d); color: #fff; font-size: 12px; font-weight: 600; cursor: grab; box-shadow: 0 3px 10px rgba(255, 138, 61, .35); }
+  .park { margin-left: auto; position: relative; display: flex; align-items: center; height: 28px; padding: 0 4px 0 34px; border-radius: 14px; background: linear-gradient(135deg, #ffb36b, #ff8a3d); color: #fff; font-size: 12px; font-weight: 600; cursor: grab; box-shadow: 0 3px 10px rgba(255, 138, 61, .35); }
   .park.new { animation: pop .5s cubic-bezier(.2, .9, .25, 1.3); }
   .park img { position: absolute; top: -6px; width: 22px; height: 29px; object-fit: cover; object-position: top; border-radius: 3px; border: 1.5px solid #fff; background: #fff; transform: rotate(var(--r)); box-shadow: 0 3px 6px rgba(0, 0, 0, .25); transition: transform .25s cubic-bezier(.2, .9, .25, 1.3); pointer-events: none; }
   .park:hover img { transform: rotate(calc(var(--r) * 1.6)) translateY(-3px); }
@@ -21,20 +23,50 @@
   .park:hover button { opacity: .8; }
   .park button:hover { background: transparent; }
   .park + .gear, .slot + .gear { margin-left: 0; }
-  /* empty stack: a dashed slot; it pulses while a file is dragged over the panel */
-  .slot { -webkit-app-region: no-drag; margin-left: auto; display: flex; align-items: center; height: 28px; padding: 0 14px; border-radius: 14px; border: 1.5px dashed rgba(255, 154, 82, .6); color: #ff8a3d; background: rgba(255, 154, 82, .08); font-size: 12px; font-weight: 600; white-space: nowrap; }
-  #shape.dragging .slot { border-color: #ff9a52; animation: breathe 1.1s ease-in-out infinite; }
+  /* empty stack: a small dashed tray next to the gear, so the tabs keep the room;
+     it opens into "drop files here" when hovered or while a file is dragged over the panel */
+  .slot { margin-left: auto; flex: none; display: flex; align-items: center; justify-content: center; height: 28px; min-width: 28px; box-sizing: border-box; padding: 0 7px; border-radius: 8px; border: 1.5px dashed color-mix(in srgb, var(--text) 28%, transparent); color: color-mix(in srgb, var(--text) 62%, transparent); background: transparent; font-size: 12px; font-weight: 600; white-space: nowrap; transition: transform .2s, color .3s, border-color .3s, background .3s; }
+  .slot:hover { color: var(--text); background: var(--soft); }
+  .slot svg { flex: none; width: 14px; height: 14px; }
+  .slot span { max-width: 0; opacity: 0; overflow: hidden; transition: max-width .55s cubic-bezier(.25, .8, .25, 1), opacity .35s ease .12s, margin .55s cubic-bezier(.25, .8, .25, 1); }
+  .slot:hover span, #shape.dragging .slot span { max-width: 160px; opacity: 1; margin-left: 6px; }
+  #shape.dragging .slot { color: var(--text); border-color: color-mix(in srgb, var(--text) 55%, transparent); animation: breathe 1.4s ease-in-out infinite; }
   #shape.dragging .park { outline: 1.5px dashed #ff9a52; outline-offset: 3px; }
   #shape.dragging .park::after { content: '+'; position: absolute; right: -7px; top: -7px; width: 16px; height: 16px; border-radius: 50%; background: #fff; color: #ff8a3d; font-size: 14px; line-height: 15px; text-align: center; box-shadow: 0 1px 4px rgba(0, 0, 0, .25); }
-  #shape.over .slot, #shape.over .park { transform: scale(1.08); background: rgba(255, 154, 82, .2); transition: transform .15s; }
+  #shape.over .slot { transform: scale(1.05); background: var(--soft); }
+  #shape.over .park { transform: scale(1.08); background: rgba(255, 154, 82, .2); transition: transform .15s; }
   #shape.over .park { background: linear-gradient(135deg, #ffbf80, #ff9550); }
-  @keyframes breathe { 50% { box-shadow: 0 0 0 4px rgba(255, 154, 82, .18); } }
+  @keyframes breathe { 50% { box-shadow: 0 0 0 4px var(--soft); } }
   @keyframes pop { from { transform: scale(.5); opacity: 0; } }
-  .gear { margin-left: auto; font-size: 26px; line-height: 1; padding: 3px 10px 5px; }
+  .gear { margin-left: auto; font-size: 20px; line-height: 1; padding: 4px 8px 6px; color: color-mix(in srgb, var(--text) 60%, transparent); }
+  .gear:hover, .gear.on { color: var(--text); }
+  /* the tabs scroll sideways once they outgrow the bar; two arrows appear and say which way more is hidden */
+  #tabs { display: flex; gap: 6px; min-width: 0; flex: 0 1 auto; overflow-x: auto; scrollbar-width: none; padding: 3px 2px; }
+  /* like Arc: only the site's icon; the open tab widens to show its name, tinted with its app's colour */
+  #tabs button { position: relative; flex: none; display: flex; align-items: center; gap: 0; height: 34px; padding: 0 9px; border-radius: 10px; font-weight: 600; transition: background .3s, gap .3s; }
+  #tabs button:hover { background: rgba(255, 255, 255, .06); }
+  #tabs .tile { display: grid; place-items: center; width: 18px; height: 18px; flex: none; }
+  #tabs .tile img { width: 18px; height: 18px; border-radius: 4px; object-fit: contain; pointer-events: none; }
+  #tabs .tile i { width: 18px; height: 18px; border-radius: 4px; background: var(--c); color: #fff; font: 800 11px/18px -apple-system, sans-serif; text-align: center; font-style: normal; }
+  #tabs .nm { max-width: 0; opacity: 0; overflow: hidden; white-space: nowrap; transition: max-width .45s cubic-bezier(.2, .8, .2, 1), opacity .3s; }
+  #tabs button.on { gap: 8px; background: color-mix(in srgb, var(--c) 22%, #2a2a33); box-shadow: 0 0 0 .5px color-mix(in srgb, var(--c) 55%, transparent) inset; }
+  #tabs button.on .nm { max-width: 140px; opacity: 1; }
+  #tabs b { position: absolute; top: 1px; left: 19px; margin: 0; transform: scale(.85); }
+  #tabs button.on b { position: static; margin-left: 0; transform: none; }
+  #tabs::-webkit-scrollbar { display: none; }
+  #tail { display: contents; }
+  .nav { flex: none; display: none; width: 24px; height: 24px; padding: 0; border-radius: 6px; border: 1px solid var(--soft); font-size: 15px; line-height: 1; }
+  #shape.overflow .nav { display: block; }
+  .nav:disabled { opacity: .3; cursor: default; background: transparent; }
+  #tabs button { transition: transform .2s cubic-bezier(.2, .8, .2, 1); }
+  #tabs.sorting button { cursor: grabbing; }
+  #tabs.sorting button:hover:not(.on) { background: transparent; }
+  #tabs button.lift { transition: none; z-index: 1; box-shadow: 0 4px 12px rgba(0, 0, 0, .35); }
   b { background: #e5484d; color: #fff; border-radius: 9px; padding: 1px 6px; margin-left: 6px; font-size: 11px; }
 </style>
 <svg id="arrow" viewBox="0 0 22 10"><path d="M0 10 L9 2 Q11 0 13 2 L22 10 Z"/></svg>
-<div id="shape"></div>
+<div id="frame"></div>
+<div id="shape"><button class="nav" id="prev">‹</button><div id="tabs"></div><button class="nav" id="next">›</button><div id="tail"></div></div>
 <script>
   let lastParked = null, selfDrag = false, hintTimer;
   const shape = document.getElementById('shape');
@@ -51,21 +83,128 @@
   document.addEventListener('drop', (e) => { e.preventDefault(); shape.classList.remove('dragging', 'over'); if (e.dataTransfer.files.length) tabs.park(...e.dataTransfer.files); });
   // a native drag swallows mouse events: the first move after it means the stack's own drag is over
   document.addEventListener('mousemove', () => { selfDrag = false; });
-  const COLORS = { whatsapp: '#25D366', telegram: '#2AABEE', slack: '#E01E5A', discord: '#5865F2', proton: '#6D4AFF', linkedin: '#0A66C2' };
-  tabs.onState(({ list, current, settingsOpen, arrowX, gearTitle, dropSlot, parked }) => {
+  const strip = document.getElementById('tabs'), tail = document.getElementById('tail');
+  const GAP = 6, EDGE = 28;
+  let drag = null, pending = null, justDragged = false, shownCurrent;
+
+  // fade only the side that hides tabs
+  const prev = document.getElementById('prev'), next = document.getElementById('next');
+  // arrows only while the tabs overflow; each one greys out once its side has nothing left
+  const edges = () => {
+    shape.classList.toggle('overflow', strip.scrollWidth > strip.clientWidth + 1);
+    prev.disabled = strip.scrollLeft <= 1;
+    next.disabled = strip.scrollLeft + strip.clientWidth >= strip.scrollWidth - 1;
+  };
+  prev.onclick = () => strip.scrollBy({ left: -strip.clientWidth * .7, behavior: 'smooth' });
+  next.onclick = () => strip.scrollBy({ left: strip.clientWidth * .7, behavior: 'smooth' });
+  strip.addEventListener('scroll', edges);
+  new ResizeObserver(edges).observe(strip);
+  // a mouse wheel scrolls vertically: turn it sideways (a trackpad swipe already is)
+  strip.addEventListener('wheel', (e) => {
+    if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+    e.preventDefault();
+    strip.scrollLeft += e.deltaY;
+  }, { passive: false });
+
+  // Drag to reorder: the tab follows the pointer, the others slide aside to open its slot.
+  // Pointer events, not HTML5 drag: that one draws a ghost image and is the file-drop path here.
+  function press(e) {
+    if (e.button !== 0) return;
+    const b = e.currentTarget, btns = [...strip.children], x0 = e.clientX, s0 = strip.scrollLeft;
+    let d = null, last = e, speed = 0;
+    const place = () => {
+      const dx = last.clientX - x0 + strip.scrollLeft - s0, mid = d.mids[d.i] + dx;
+      let to = d.i;
+      while (to < btns.length - 1 && mid > d.mids[to + 1]) to++;
+      while (to > 0 && mid < d.mids[to - 1]) to--;
+      d.to = to;
+      b.style.transform = `translateX(${dx}px) scale(1.04)`;
+      btns.forEach((x, k) => {
+        if (x === b) return;
+        const shift = d.i < to && k > d.i && k <= to ? -d.w : d.i > to && k >= to && k < d.i ? d.w : 0;
+        x.style.transform = shift ? `translateX(${shift}px)` : '';
+      });
+    };
+    // near an edge the strip scrolls on its own, so a tab can travel past what is on screen
+    const roll = () => {
+      if (!d || d.done) return;
+      if (speed) { strip.scrollLeft += speed; place(); }
+      requestAnimationFrame(roll);
+    };
+    const move = (ev) => {
+      last = ev;
+      if (!d) {
+        if (Math.abs(ev.clientX - x0) < 5) return; // still a click
+        d = drag = { i: btns.indexOf(b), to: btns.indexOf(b), w: b.offsetWidth + GAP, mids: btns.map((x) => x.offsetLeft + x.offsetWidth / 2) };
+        b.classList.add('lift');
+        strip.classList.add('sorting');
+        requestAnimationFrame(roll);
+      }
+      const r = strip.getBoundingClientRect();
+      speed = ev.clientX < r.left + EDGE ? -8 : ev.clientX > r.right - EDGE ? 8 : 0;
+      place();
+    };
+    const up = () => {
+      removeEventListener('pointermove', move);
+      removeEventListener('pointerup', up);
+      removeEventListener('pointercancel', up);
+      if (!d) return;
+      d.done = true;
+      justDragged = true; // the click that follows the release must not select the tab
+      setTimeout(() => { justDragged = false; });
+      // glide into the slot, then commit
+      const span = (a, z) => btns.slice(a, z).reduce((n, x) => n + x.offsetWidth + GAP, 0);
+      const final = d.to > d.i ? span(d.i + 1, d.to + 1) : -span(d.to, d.i);
+      b.style.transition = 'transform .18s cubic-bezier(.2, .8, .2, 1)';
+      b.style.transform = `translateX(${final}px)`;
+      setTimeout(() => {
+        const moved = d.to !== d.i;
+        if (moved) strip.insertBefore(b, d.to > d.i ? btns[d.to].nextSibling : btns[d.to]);
+        for (const x of btns) { x.style.transition = 'none'; x.style.transform = ''; }
+        b.classList.remove('lift');
+        strip.classList.remove('sorting');
+        void strip.offsetWidth; // apply the reset before the transitions come back
+        for (const x of btns) x.style.transition = '';
+        drag = null;
+        // the push that answers the reorder carries the new order: an older one would flash the old order
+        if (moved) { pending = null; tabs.reorder([...strip.children].map((x) => x.dataset.id)); } else if (pending) { render(pending); pending = null; }
+      }, 180);
+    };
+    addEventListener('pointermove', move);
+    addEventListener('pointerup', up);
+    addEventListener('pointercancel', up);
+  }
+
+  // unread counts keep arriving while a tab is held: rebuilding the strip then would drop it, so wait
+  tabs.onState((st) => { if (drag) pending = st; else render(st); });
+  function render({ list, current, settingsOpen, arrowX, gearTitle, dropSlot, parked }) {
     const arrow = document.getElementById('arrow');
     arrow.style.display = arrowX == null ? 'none' : 'block';
     if (arrowX != null) arrow.style.left = `${arrowX - 11}px`;
-    document.getElementById('shape').replaceChildren(...list.map((s) => {
+    const x = strip.scrollLeft;
+    strip.replaceChildren(...list.map((s) => {
       const b = document.createElement('button');
-      b.textContent = s.name;
-      if (COLORS[s.id]) b.style.setProperty('--c', COLORS[s.id]);
+      const tile = Object.assign(document.createElement('span'), { className: 'tile' });
+      const letter = () => tile.replaceChildren(Object.assign(document.createElement('i'), { textContent: s.name[0] }));
+      // until the page says its icon (or if it fails to load): the initial on the app's colour
+      if (s.icon) tile.append(Object.assign(document.createElement('img'), { src: s.icon, onerror: letter, draggable: false }));
+      else letter();
+      b.append(tile, Object.assign(document.createElement('span'), { className: 'nm', textContent: s.name }));
+      b.title = s.name;
+      b.dataset.id = s.id;
+      b.style.setProperty('--c', s.color);
       if (s.id === current && !settingsOpen) b.className = 'on';
       if (s.unread) { const n = document.createElement('b'); n.textContent = s.unread > 99 ? '99+' : s.unread; b.append(n); }
-      b.onclick = () => tabs.select(s.id);
+      b.onpointerdown = press;
+      b.onclick = () => { if (!justDragged) tabs.select(s.id); };
       b.oncontextmenu = (e) => { e.preventDefault(); tabs.menu(s.id); };
       return b;
-    }), ...(parked ? [(() => {
+    }));
+    strip.scrollLeft = x; // emptied and refilled, the strip would jump back to the start
+    // a tab opened from the menu or a shortcut may sit off screen
+    if (current !== shownCurrent) { shownCurrent = current; strip.querySelector('.on')?.scrollIntoView({ inline: 'nearest', block: 'nearest', behavior: 'smooth' }); }
+    edges();
+    tail.replaceChildren(...(parked ? [(() => {
       const p = document.createElement('div');
       // the chip is rebuilt on every state push: animate only a newly parked file
       p.className = parked.at === lastParked ? 'park' : 'park new';
@@ -89,7 +228,14 @@
       x.onclick = () => tabs.unpark();
       p.append(...imgs, n, x);
       return p;
-    })()] : [Object.assign(document.createElement('div'), { className: 'slot', textContent: `＋ ${dropSlot}` })]), (() => {
+    })()] : [(() => {
+      const d = document.createElement('div');
+      d.className = 'slot';
+      d.title = dropSlot;
+      d.innerHTML = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v7M5 6.5 8 9.5l3-3M2.5 10v2.5a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1V10"/></svg>';
+      d.append(Object.assign(document.createElement('span'), { textContent: dropSlot }));
+      return d;
+    })()]), (() => {
       const g = document.createElement('button');
       g.className = `gear${settingsOpen ? ' on' : ''}`;
       g.title = gearTitle;
@@ -97,5 +243,5 @@
       g.onclick = () => tabs.gear();
       return g;
     })());
-  });
+  }
 </script>

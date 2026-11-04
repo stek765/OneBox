@@ -1,4 +1,4 @@
-const { app, BrowserWindow, WebContentsView, Notification, Tray, ipcMain, shell, Menu, nativeTheme, nativeImage, globalShortcut, screen, net, desktopCapturer } = require('electron');
+const { app, BaseWindow, BrowserWindow, WebContentsView, Notification, Tray, ipcMain, shell, Menu, nativeTheme, nativeImage, globalShortcut, screen, net, desktopCapturer } = require('electron');
 const fs = require('fs');
 const os = require('os');
 const crypto = require('crypto');
@@ -42,9 +42,10 @@ const DEFAULTS = [
   { id: 'gmail', name: 'Gmail (not working: needs IMAP)', url: 'https://mail.google.com', allow: [], deny: [] },
 ];
 
-const BAR = 44; // tab strip height
+const BAR = 48; // tab strip height
 const AR = 10; // arrow height
 const R = 12; // corner radius
+const F = 6; // the bar's dark goes on around the page as a frame: Onebox holds the page, not the other way round
 // sites refuse a browser that says "Electron"
 const UA = `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${process.versions.chrome} Safari/537.36`;
 
@@ -57,6 +58,13 @@ let halo, haloTimer; // "drop here" pill under the icon while a file is dragged 
 const services = [];
 const views = {}; // service id -> WebContentsView
 const unread = {};
+const favicons = {}; // each tab wears its site's own icon, as the page declares it
+const BEST_ICON = `(() => {
+  const score = (e) => /\\.svg(\\?|$)/i.test(e.href) || e.type === 'image/svg+xml' || /\\bany\\b/.test(e.getAttribute('sizes') || '') ? 1e4
+    : Math.max(0, ...(e.getAttribute('sizes') || '').split(/\\s+/).map((x) => parseInt(x) || 0));
+  const icons = [...document.querySelectorAll('link[rel~="icon"]')].map((e) => [score(e), e.href]).filter(([n]) => n >= 32);
+  return icons.sort((a, b) => b[0] - a[0])[0]?.[1] || '';
+})()`;
 
 // settings.json. Every key has a validator: nothing else gets in from the renderer.
 const ICONS = [['cubo', 'Cubo'], ['pieno', 'Pieno'], ['contorno', 'Contorno'], ['aperto', 'Aperto']];
@@ -65,6 +73,7 @@ const bool = (v) => typeof v === 'boolean';
 const HHMM = /^\d\d:\d\d$/;
 const VALID = {
   theme: (v) => ['system', 'light', 'dark'].includes(v),
+  colors: (v) => v && typeof v === 'object' && !Array.isArray(v) && Object.keys(v).length <= 200 && Object.values(v).every((c) => /^#[0-9a-f]{6}$/i.test(c)),
   notifications: bool,
   quiet: (v) => v && bool(v.on) && HHMM.test(v.from) && HHMM.test(v.to),
   muted: (v) => Array.isArray(v) && v.every((x) => typeof x === 'string'),
@@ -76,8 +85,9 @@ const VALID = {
   width: (v) => Number.isInteger(v) && v >= 420 && v <= 1400,
   shortcut: (v) => SHORTCUTS.includes(v),
   lang: (v) => v in STR,
+  order: (v) => Array.isArray(v) && v.length <= 200 && v.every((x) => typeof x === 'string'),
 };
-const SET_DEFAULTS = { theme: 'light', notifications: true, quiet: { on: false, from: '22:00', to: '08:00' }, muted: [], hidden: ['gmail'], icon: 'cubo', launchAtLogin: false, closeOnBlur: true, showCount: true, lang: 'en', shortcut: '', zoom: 0.8, width: 820, clearCacheOnQuit: true, animate: true, updateBadge: true };
+const SET_DEFAULTS = { theme: 'light', notifications: true, quiet: { on: false, from: '22:00', to: '08:00' }, muted: [], hidden: ['gmail'], icon: 'cubo', launchAtLogin: false, closeOnBlur: true, showCount: true, lang: 'en', shortcut: '', zoom: 0.8, width: 820, clearCacheOnQuit: true, animate: true, updateBadge: true, order: [], colors: {} };
 let S = SET_DEFAULTS;
 const T = () => STR[S.lang];
 const setFile = () => path.join(app.getPath('userData'), 'settings.json');
@@ -89,8 +99,25 @@ function loadSettings() {
   for (const k of Object.keys(SET_DEFAULTS)) if (VALID[k] && !VALID[k](S[k])) S[k] = SET_DEFAULTS[k];
 }
 
+// The order lives in settings.json, not services.json: that file is hand-edited, and a drag
+// rewriting it would reformat it under the user. Ids not in the list keep their file order, at the end.
+// Tab colours: the user's pick, else the brand's, else a steady hue from the id so a tab added later is never grey.
+// Always hex: the settings colour picker only takes that.
+const BRAND = { whatsapp: '#25D366', telegram: '#2AABEE', slack: '#E01E5A', discord: '#5865F2', proton: '#6D4AFF', linkedin: '#0A66C2' };
+const hslHex = (h, s = 0.58, l = 0.5) => '#' + [0, 8, 4].map((n) => {
+  const k = (n + h / 30) % 12;
+  return Math.round(255 * (l - s * Math.min(l, 1 - l) * Math.max(-1, Math.min(k - 3, 9 - k, 1)))).toString(16).padStart(2, '0');
+}).join('');
+const colorOf = (id) => S.colors[id] || BRAND[id] || hslHex([...id].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 7));
+
+const sortServices = () => {
+  const at = (s) => { const i = S.order.indexOf(s.id); return i < 0 ? Infinity : i; };
+  services.sort((a, b) => at(a) - at(b)); // stable: unlisted ones stay in file order
+};
+
 function applySettings() {
   nativeTheme.themeSource = S.theme;
+  sortServices();
   buildAppMenu();
   if (!animating) tray.setImage(restIcon());
   globalShortcut.unregisterAll();
@@ -171,9 +198,16 @@ function hideUnlessDrop() {
   });
 }
 
+// Only the page on screen is attached to the window. Hidden views stacked under it still took part in the
+// cursor updates, so on every mouse move the hand flickered to an arrow.
+function attach(v) {
+  for (const x of [...Object.values(views), settingsView]) if (x !== v && win.contentView.children.includes(x)) win.contentView.removeChildView(x);
+  if (!win.contentView.children.includes(v)) win.contentView.addChildView(v);
+}
+
 function toggleSettings() {
   settingsOpen = !settingsOpen;
-  settingsView.setVisible(settingsOpen);
+  attach(settingsOpen ? settingsView : views[current]);
   if (settingsOpen) settingsView.webContents.send('open');
   pushState();
 }
@@ -196,7 +230,7 @@ const arrowFor = (t, winX) => Math.min(Math.max(Math.round(t.x + (t.width > 50 ?
 function pushState() {
   if (win?.isVisible() && arrowX != null) arrowX = arrowFor(tray.getBounds(), win.getPosition()[0]); // the count changes the item width
   // a muted service counts neither on its tab nor next to the icon
-  const list = visible().map((s) => ({ id: s.id, name: s.name, unread: S.muted.includes(s.id) ? 0 : unread[s.id] || 0 }));
+  const list = visible().map((s) => ({ id: s.id, name: s.name, color: colorOf(s.id), icon: favicons[s.id], unread: S.muted.includes(s.id) ? 0 : unread[s.id] || 0 }));
   bar.webContents.send('state', { current, settingsOpen, arrowX, list, gearTitle: T().settings, dropSlot: T().dropSlot, parked: parked.length ? {
     label: parked.length > 1 ? T().nFiles.replace('{0}', parked.length) : parked[0].name,
     tip: parked.map((f) => [f.name, f.info].filter(Boolean).join(' · ')).join('\n'),
@@ -211,17 +245,16 @@ function pushState() {
 function layout() {
   const [w, h] = win.getContentSize();
   const top = AR + BAR;
-  // the bar extends R px behind the pages so their rounded corners show its color, not a gap
-  bar.setBounds({ x: 0, y: 0, width: w, height: top + R });
-  for (const v of [...Object.values(views), settingsView]) v.setBounds({ x: 0, y: top, width: w, height: h - top });
+  // the bar's view lies behind the whole panel: its dark shows above the page and as a thin frame around it
+  bar.setBounds({ x: 0, y: 0, width: w, height: h });
+  for (const v of [...Object.values(views), settingsView]) v.setBounds({ x: F, y: top, width: w - 2 * F, height: h - top - F });
 }
 
 function select(id) {
   if (S.hidden.includes(id)) return;
   current = id;
   settingsOpen = false;
-  settingsView.setVisible(false);
-  for (const [k, v] of Object.entries(views)) v.setVisible(k === id);
+  attach(views[id]);
   applyAudio();
   pushState();
 }
@@ -242,7 +275,7 @@ function addService(svc) {
       backgroundThrottling: false, // otherwise background tabs stop receiving messages
     },
   });
-  view.setBorderRadius(R);
+  view.setBorderRadius(R - F); // concentric with the frame's outer corner
   const wc = view.webContents;
   wc.setUserAgent(UA);
   // Google rejects sign-in when "Google Chrome" is missing from the brands
@@ -282,17 +315,30 @@ function addService(svc) {
     unread[svc.id] = m ? Number(m[1]) : 0;
     pushState();
   });
+  // the first icon a page reports is often its 16 px one, blurry on the tab: a vector one if declared, else the largest sized one
+  wc.on('page-favicon-updated', async (_e, f) => {
+    const best = await wc.executeJavaScript(BEST_ICON).catch(() => '');
+    const icon = best || f[0];
+    if (icon && icon !== favicons[svc.id]) { favicons[svc.id] = icon; pushState(); }
+  });
   wc.setAudioMuted(S.muted.includes(svc.id) && !(win?.isVisible() && svc.id === current));
   // web apps are wide: zoom out to fit the columns. Reapplied on every navigation, Chromium resets it
   for (const ev of ['dom-ready', 'did-finish-load', 'did-navigate', 'did-navigate-in-page']) wc.on(ev, () => wc.setZoomFactor(S.zoom));
   if (new URL(svc.url).hostname === 'web.whatsapp.com') waWc = wc;
   wc.loadURL(svc.url);
-  win.contentView.addChildView(view);
   views[svc.id] = view;
 }
 
 ipcMain.on('select', (_e, id) => views[id] && select(id));
 ipcMain.on('gear', toggleSettings);
+// the bar only knows the visible tabs: hidden ones keep their slots, the visible slots take the new order
+ipcMain.on('reorder', (e, ids) => {
+  if (e.sender !== bar.webContents || !Array.isArray(ids)) return;
+  const vis = visible().map((s) => s.id);
+  if (ids.length !== vis.length || !ids.every((id) => vis.includes(id))) return;
+  let k = 0;
+  updateSettings({ order: services.map((s) => (vis.includes(s.id) ? ids[k++] : s.id)) });
+});
 // the stack leaves as real files, so any target takes it: a chat, Mail, Finder
 ipcMain.on('park-drag', (e) => parked.length && e.sender === bar.webContents && e.sender.startDrag({ file: parked[0].path, files: parked.map((f) => f.path), icon: parkedIcon }));
 ipcMain.on('park-files', (e, paths) => e.sender === bar.webContents && parkFiles(paths.filter((f) => typeof f === 'string' && f && fs.existsSync(f))));
@@ -392,7 +438,7 @@ function installUpdate() {
 ipcMain.on('settings:update', (e) => fromFile(e) && downloadUpdate());
 ipcMain.on('settings:release', (e) => fromFile(e) && shell.openExternal(RELEASES));
 ipcMain.on('settings:install', (e) => fromFile(e) && installUpdate());
-const settingsPayload = () => ({ settings: S, t: T(), services: services.map(({ id, name }) => ({ id, name })), icons: ICONS, version: app.getVersion(), latest, upd: { state: upd.state, pct: upd.pct }, canInstall: !!(asset && appBundle()) });
+const settingsPayload = () => ({ settings: S, t: T(), services: services.map(({ id, name }) => ({ id, name, color: colorOf(id), custom: id in S.colors })), icons: ICONS, version: app.getVersion(), latest, upd: { state: upd.state, pct: upd.pct }, canInstall: !!(asset && appBundle()) });
 ipcMain.handle('settings:get', (e) => (fromFile(e) ? settingsPayload() : null));
 ipcMain.handle('settings:set', (e, patch) => {
   if (!fromFile(e)) return null;
@@ -486,6 +532,7 @@ function showPanel() {
   pushState();
   win.show();
   app.focus({ steal: true });
+  (settingsOpen ? settingsView : views[current])?.webContents.focus(); // nothing else in the window takes the keys
   // the icon bounds settle after the click: recompute the arrow
   for (const ms of [80, 300]) setTimeout(() => win.isVisible() && pushState(), ms);
 }
@@ -513,7 +560,9 @@ app.whenReady().then(() => {
     { label: T().quitMenu, click: () => app.quit() },
   ])));
 
-  win = new BrowserWindow({ width: S.width, height: 780, show: false, frame: false, resizable: true, fullscreenable: false, skipTaskbar: true, alwaysOnTop: true, transparent: true, backgroundColor: '#00000000', hasShadow: true });
+  // BaseWindow, not BrowserWindow: a BrowserWindow keeps a blank page of its own under the views, and on every
+  // mouse move that page set the arrow cursor, then the view on top put the hand back (the cursor flickered)
+  win = new BaseWindow({ width: S.width, height: 780, show: false, frame: false, resizable: true, fullscreenable: false, skipTaskbar: true, alwaysOnTop: true, transparent: true, backgroundColor: '#00000000', hasShadow: true });
   win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true }); // once, at creation: follows you to whatever Space you open it from. Toggling this on/off around every show() corrupted the window's buffer (v0.3.10 regression)
   win.on('blur', () => S.closeOnBlur && hideUnlessDrop()); // click outside closes it
   bar = new WebContentsView({ webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, sandbox: true } });
@@ -522,9 +571,7 @@ app.whenReady().then(() => {
   services.forEach(addService);
   settingsView = new WebContentsView({ webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, sandbox: true } });
   settingsView.webContents.loadFile(path.join(__dirname, 'settings.html'));
-  settingsView.setBorderRadius(R);
-  win.contentView.addChildView(settingsView); // above the service tabs
-  settingsView.setVisible(false);
+  settingsView.setBorderRadius(R - F);
   bar.setBackgroundColor('#00000000');
   win.on('show', applyAudio);
   win.on('hide', applyAudio);
