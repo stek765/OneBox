@@ -12,7 +12,23 @@ const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) app.quit();
 // other apps can bring a tab to the front: open -n -a Onebox --args --open=whatsapp
 const asked = (argv) => visible().find((s) => argv.includes(`--open=${s.id}`))?.id;
-app.on('second-instance', (_e, argv) => { if (!win) return; const id = asked(argv); if (id) select(id); showPanel(); });
+// open -n -a Onebox --args --url=<link>: the tab of that site loads it, a link no tab owns goes to the browser
+const wanted = (argv) => argv.find((a) => a.startsWith('--url='))?.slice(6);
+app.on('second-instance', (_e, argv) => {
+  if (!win) return;
+  const link = wanted(argv);
+  if (link) return openLink(link);
+  const id = asked(argv); if (id) select(id); showPanel();
+});
+function openLink(link) {
+  if (!/^https?:/.test(link)) return;
+  const origin = (u) => { try { return new URL(u).origin; } catch { return null; } };
+  const s = visible().find((x) => views[x.id] && origin(x.url) === origin(link));
+  if (!s) return shell.openExternal(link);
+  select(s.id);
+  views[s.id].webContents.loadURL(link);
+  showPanel();
+}
 
 // Default services, copied to services.json on first run. allow/deny are case-insensitive regexes tested on "title\nbody".
 const DEFAULTS = [
@@ -519,6 +535,6 @@ app.whenReady().then(() => {
   playTray(START_FRAMES, 140); // build-up animation at launch
   checkUpdate();
   setInterval(checkUpdate, 24 * 3600 * 1000);
-  bar.webContents.once('did-finish-load', () => { select(asked(process.argv) ?? visible()[0].id); showPanel(); if (process.argv.includes('--settings')) toggleSettings(); });
+  bar.webContents.once('did-finish-load', () => { select(asked(process.argv) ?? visible()[0].id); showPanel(); if (wanted(process.argv)) openLink(wanted(process.argv)); if (process.argv.includes('--settings')) toggleSettings(); });
   app.on('will-quit', () => globalShortcut.unregisterAll());
 });
