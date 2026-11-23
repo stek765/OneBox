@@ -109,11 +109,10 @@ if (location.protocol === 'file:') {
         }
       };
       new MutationObserver(() => { if (!queued) { queued = true; requestAnimationFrame(sync); } }).observe(document, { childList: true, subtree: true });
-      // Esc closes an open emoji panel. WhatsApp does it only while the focus is inside the panel;
-      // from the message box its Esc closes the whole chat, so there the panel's own button is pressed first.
+      // One Esc closes an open emoji panel, wherever the focus is: WhatsApp's own Esc needs two from the
+      // panel's search and closes the whole chat from the message box. The panel's button is pressed instead.
       addEventListener('keydown', (e) => {
-        const panel = document.querySelector('#expressions-panel-container [role=application]');
-        if (e.key !== 'Escape' || !panel || panel.contains(document.activeElement)) return;
+        if (e.key !== 'Escape' || !document.querySelector('#expressions-panel-container [role=application]')) return;
         const btn = document.querySelector('#main footer button[data-tab="10"]:not([aria-haspopup])');
         if (!btn) return;
         e.preventDefault(); e.stopImmediatePropagation();
