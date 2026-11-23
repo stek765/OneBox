@@ -6,6 +6,7 @@ if (location.protocol === 'file:') {
     onState: (cb) => ipcRenderer.on('state', (_e, s) => cb(s)),
     select: (id) => ipcRenderer.send('select', id),
     gear: () => ipcRenderer.send('gear'),
+    add: () => ipcRenderer.send('add-tab'),
     menu: (id) => ipcRenderer.send('tab-menu', id),
     reorder: (ids) => ipcRenderer.send('reorder', ids),
     dragParked: () => ipcRenderer.send('park-drag'),
@@ -16,12 +17,14 @@ if (location.protocol === 'file:') {
   contextBridge.exposeInMainWorld('settings', {
     get: () => ipcRenderer.invoke('settings:get'),
     set: (patch) => ipcRenderer.invoke('settings:set', patch),
+    edit: (op, id, ...a) => ipcRenderer.invoke('services:edit', op, id, ...a),
     quit: () => ipcRenderer.send('settings:quit'),
     update: () => ipcRenderer.send('settings:update'),
     openRelease: () => ipcRenderer.send('settings:release'),
     install: () => ipcRenderer.send('settings:install'),
     onUpdate: (cb) => ipcRenderer.on('update-state', cb),
     onOpen: (cb) => ipcRenderer.on('open', cb),
+    onFocusAdd: (cb) => ipcRenderer.on('focus-add', cb),
   });
 } else {
   // a file dragged over the page: tell the tab bar, which shows where it can be parked
@@ -35,6 +38,7 @@ if (location.protocol === 'file:') {
   contextBridge.exposeInMainWorld('__inbox', {
     back: () => ipcRenderer.send('wa-back'),
     notify: (title, body) => ipcRenderer.send('notify', String(title).slice(0, 200), String(body).slice(0, 300)),
+    badge: (n) => ipcRenderer.send('badge', Math.max(0, Math.floor(Number(n) || 0))),
   });
   webFrame.executeJavaScript(`(() => {
     const send = (t, o) => window.__inbox.notify(t, (o && o.body) || '');
@@ -52,6 +56,20 @@ if (location.protocol === 'file:') {
     }
     if (window.ServiceWorkerRegistration)
       ServiceWorkerRegistration.prototype.showNotification = (t, o) => { send(t, o); return Promise.resolve(); };
+    // the app-icon badge (Telegram's unread count; its title carries none)
+    if (navigator.setAppBadge) {
+      const badge = (n) => { window.__inbox.badge(n); return Promise.resolve(); };
+      Object.defineProperty(navigator, 'setAppBadge', { value: badge, configurable: true });
+      Object.defineProperty(navigator, 'clearAppBadge', { value: () => badge(0), configurable: true });
+    }
+    // Telegram hands new-message notifications to its service worker, which this script can't reach
+    if (window.ServiceWorker) {
+      const post = ServiceWorker.prototype.postMessage;
+      ServiceWorker.prototype.postMessage = function (m, ...a) {
+        if (m && m.type === 'showMessageNotification') { if (!m.payload?.isSilent) send(m.payload?.title, m.payload); return; }
+        return post.call(this, m, ...a);
+      };
+    }
   })()`);
   if (location.hostname === 'web.whatsapp.com') {
     // Single column: while a chat is open (#main) ob-chat-open hides the list (the parent of #side).

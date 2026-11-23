@@ -47,6 +47,8 @@
   #tabs button:hover { background: rgba(255, 255, 255, .06); }
   #tabs .tile { display: grid; place-items: center; width: 18px; height: 18px; flex: none; }
   #tabs .tile img { width: 18px; height: 18px; border-radius: 4px; object-fit: contain; pointer-events: none; }
+  /* Vaultwarden's logo is black: on the dark bar it sits on a white disc, as on its own site */
+  #tabs .tile img[src$="vaultwarden.svg"] { background: #fff; border-radius: 50%; }
   #tabs .tile i { width: 18px; height: 18px; border-radius: 4px; background: var(--c); color: #fff; font: 800 11px/18px -apple-system, sans-serif; text-align: center; font-style: normal; }
   #tabs .nm { max-width: 0; opacity: 0; overflow: hidden; white-space: nowrap; transition: max-width .45s cubic-bezier(.2, .8, .2, 1), opacity .3s; }
   #tabs button.on { gap: 8px; background: color-mix(in srgb, var(--c) 22%, #2a2a33); box-shadow: 0 0 0 .5px color-mix(in srgb, var(--c) 55%, transparent) inset; }
@@ -54,6 +56,13 @@
   #tabs b { position: absolute; top: 1px; left: 19px; margin: 0; transform: scale(.85); }
   #tabs button.on b { position: static; margin-left: 0; transform: none; }
   #tabs::-webkit-scrollbar { display: none; }
+  /* your own server's apps, apart from the cloud ones: a thin divider before the first of them */
+  /* your server's apps start after a small server glyph (Lucide "server", ISC) */
+  #tabs button.srv1 { margin-left: 24px; }
+  #tabs button.srv1::before { content: ''; position: absolute; left: -22px; top: 50%; width: 14px; height: 14px; margin-top: -7px; opacity: .5; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='20' height='8' x='2' y='2' rx='2' ry='2'/%3E%3Crect width='20' height='8' x='2' y='14' rx='2' ry='2'/%3E%3Cline x1='6' x2='6.01' y1='6' y2='6'/%3E%3Cline x1='6' x2='6.01' y1='18' y2='18'/%3E%3C/svg%3E") center / contain no-repeat; }
+  /* add a service: a small dashed square right after the tabs */
+  #add { flex: none; width: 28px; height: 28px; padding: 0; margin-left: 2px; border-radius: 9px; border: 1.5px dashed rgba(255, 255, 255, .22); color: rgba(255, 255, 255, .55); font: 300 19px/1 -apple-system, sans-serif; }
+  #add:hover { color: var(--text); border-color: rgba(255, 255, 255, .45); background: var(--soft); }
   #tail { display: contents; }
   .nav { flex: none; display: none; width: 24px; height: 24px; padding: 0; border-radius: 6px; border: 1px solid var(--soft); font-size: 15px; line-height: 1; }
   #shape.overflow .nav { display: block; }
@@ -66,7 +75,7 @@
 </style>
 <svg id="arrow" viewBox="0 0 22 10"><path d="M0 10 L9 2 Q11 0 13 2 L22 10 Z"/></svg>
 <div id="frame"></div>
-<div id="shape"><button class="nav" id="prev">‹</button><div id="tabs"></div><button class="nav" id="next">›</button><div id="tail"></div></div>
+<div id="shape"><button class="nav" id="prev">‹</button><div id="tabs"></div><button class="nav" id="next">›</button><button id="add">+</button><div id="tail"></div></div>
 <script>
   let lastParked = null, selfDrag = false, hintTimer;
   const shape = document.getElementById('shape');
@@ -177,12 +186,14 @@
 
   // unread counts keep arriving while a tab is held: rebuilding the strip then would drop it, so wait
   tabs.onState((st) => { if (drag) pending = st; else render(st); });
-  function render({ list, current, settingsOpen, arrowX, gearTitle, dropSlot, parked }) {
+  document.getElementById('add').onclick = () => tabs.add();
+  function render({ list, current, settingsOpen, arrowX, gearTitle, addTitle, dropSlot, parked }) {
+    document.getElementById('add').title = addTitle;
     const arrow = document.getElementById('arrow');
     arrow.style.display = arrowX == null ? 'none' : 'block';
     if (arrowX != null) arrow.style.left = `${arrowX - 11}px`;
     const x = strip.scrollLeft;
-    strip.replaceChildren(...list.map((s) => {
+    strip.replaceChildren(...list.map((s, i) => {
       const b = document.createElement('button');
       const tile = Object.assign(document.createElement('span'), { className: 'tile' });
       const letter = () => tile.replaceChildren(Object.assign(document.createElement('i'), { textContent: s.name[0] }));
@@ -193,7 +204,8 @@
       b.title = s.name;
       b.dataset.id = s.id;
       b.style.setProperty('--c', s.color);
-      if (s.id === current && !settingsOpen) b.className = 'on';
+      if (s.id === current && !settingsOpen) b.classList.add('on');
+      if (s.server && i > 0 && !list[i - 1].server) b.classList.add('srv1');
       if (s.unread) { const n = document.createElement('b'); n.textContent = s.unread > 99 ? '99+' : s.unread; b.append(n); }
       b.onpointerdown = press;
       b.onclick = () => { if (!justDragged) tabs.select(s.id); };

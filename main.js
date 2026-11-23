@@ -38,9 +38,18 @@ const DEFAULTS = [
   { id: 'discord', name: 'Discord', url: 'https://discord.com/app', allow: [], deny: [] },
   { id: 'proton', name: 'Proton', url: 'https://mail.proton.me', allow: [], deny: [] },
   { id: 'linkedin', name: 'LinkedIn', url: 'https://www.linkedin.com/messaging/', allow: [], deny: [] },
-  // hidden by default (see SET_DEFAULTS): Google blocks sign-in in embedded browsers
-  { id: 'gmail', name: 'Gmail (not working: needs IMAP)', url: 'https://mail.google.com', allow: [], deny: [] },
 ];
+// Self-hosted apps: always listed, off until the user gives the address of their own server (Settings › Services).
+// Added to existing services.json files too, so an update brings them.
+const HOMELAB = [
+  { id: 'navidrome', name: 'Navidrome', example: 'http://192.168.1.10:4533' },
+  { id: 'jellyfin', name: 'Jellyfin', example: 'http://192.168.1.10:8096' },
+  { id: 'vaultwarden', name: 'Bitwarden', example: 'https://server.tailnet.ts.net', https: true },
+  { id: 'immich', name: 'Immich', example: 'http://192.168.1.10:2283' },
+  { id: 'homeassistant', name: 'Home Assistant', example: 'http://192.168.1.10:8123' },
+  { id: 'paperless', name: 'Paperless', example: 'http://192.168.1.10:8000' },
+];
+const preset = ({ id, name }) => ({ id, name, url: '', allow: [], deny: [] });
 
 const BAR = 48; // tab strip height
 const AR = 10; // arrow height
@@ -73,7 +82,6 @@ const bool = (v) => typeof v === 'boolean';
 const HHMM = /^\d\d:\d\d$/;
 const VALID = {
   theme: (v) => ['system', 'light', 'dark'].includes(v),
-  colors: (v) => v && typeof v === 'object' && !Array.isArray(v) && Object.keys(v).length <= 200 && Object.values(v).every((c) => /^#[0-9a-f]{6}$/i.test(c)),
   notifications: bool,
   quiet: (v) => v && bool(v.on) && HHMM.test(v.from) && HHMM.test(v.to),
   muted: (v) => Array.isArray(v) && v.every((x) => typeof x === 'string'),
@@ -87,7 +95,7 @@ const VALID = {
   lang: (v) => v in STR,
   order: (v) => Array.isArray(v) && v.length <= 200 && v.every((x) => typeof x === 'string'),
 };
-const SET_DEFAULTS = { theme: 'light', notifications: true, quiet: { on: false, from: '22:00', to: '08:00' }, muted: [], hidden: ['gmail'], icon: 'cubo', launchAtLogin: false, closeOnBlur: true, showCount: true, lang: 'en', shortcut: '', zoom: 0.8, width: 820, clearCacheOnQuit: true, animate: true, updateBadge: true, order: [], colors: {} };
+const SET_DEFAULTS = { theme: 'light', notifications: true, quiet: { on: false, from: '22:00', to: '08:00' }, muted: [], hidden: [], icon: 'cubo', launchAtLogin: false, closeOnBlur: true, showCount: true, lang: 'en', shortcut: '', zoom: 0.8, width: 820, clearCacheOnQuit: true, animate: true, updateBadge: true, order: [] };
 let S = SET_DEFAULTS;
 const T = () => STR[S.lang];
 const setFile = () => path.join(app.getPath('userData'), 'settings.json');
@@ -101,19 +109,29 @@ function loadSettings() {
 
 // The order lives in settings.json, not services.json: that file is hand-edited, and a drag
 // rewriting it would reformat it under the user. Ids not in the list keep their file order, at the end.
-// Tab colours: the user's pick, else the brand's, else a steady hue from the id so a tab added later is never grey.
-// Always hex: the settings colour picker only takes that.
+// Tab colours: the brand's, else a steady hue from the id so a tab added later is never grey.
 const BRAND = { whatsapp: '#25D366', telegram: '#2AABEE', slack: '#E01E5A', discord: '#5865F2', proton: '#6D4AFF', linkedin: '#0A66C2' };
 const hslHex = (h, s = 0.58, l = 0.5) => '#' + [0, 8, 4].map((n) => {
   const k = (n + h / 30) % 12;
   return Math.round(255 * (l - s * Math.min(l, 1 - l) * Math.max(-1, Math.min(k - 3, 9 - k, 1)))).toString(16).padStart(2, '0');
 }).join('');
-const colorOf = (id) => S.colors[id] || BRAND[id] || hslHex([...id].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 7));
+const colorOf = (id) => BRAND[id] || hslHex([...id].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 7));
+
+// Your own server's apps sit apart from the cloud ones, after a divider: the presets, and any added app
+// whose address is private (home network, Tailscale, .local)
+const PRIVATE = /^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.)|\.(local|lan|home|internal|ts\.net)$/;
+const hostOf = (u) => { try { return new URL(u).hostname; } catch { return ''; } };
+const onServer = (s) => !!homeOf(s.id) || (!builtIn(s.id) && PRIVATE.test(hostOf(s.url)));
+// presets wear their project's logo (assets/services, from dashboard-icons, Apache-2.0); other tabs their site's icon
+const iconOf = (id) => (homeOf(id) ? `assets/services/${id}.svg` : favicons[id]);
 
 const sortServices = () => {
-  const at = (s) => { const i = S.order.indexOf(s.id); return i < 0 ? Infinity : i; };
+  const at = (s) => { const i = S.order.indexOf(s.id); return (onServer(s) ? 1e6 : 0) + (i < 0 ? 1e5 : i); };
   services.sort((a, b) => at(a) - at(b)); // stable: unlisted ones stay in file order
 };
+
+// a service can set its own "zoom" in services.json (e.g. a wide web app); else the global one
+const zoomOf = (id) => services.find((s) => s.id === id)?.zoom ?? S.zoom;
 
 function applySettings() {
   nativeTheme.themeSource = S.theme;
@@ -123,7 +141,7 @@ function applySettings() {
   globalShortcut.unregisterAll();
   if (S.shortcut) globalShortcut.register(S.shortcut, togglePanel);
   for (const [id, v] of Object.entries(views)) {
-    v.webContents.setZoomFactor(S.zoom);
+    v.webContents.setZoomFactor(zoomOf(id));
   }
   applyAudio();
   if (S.hidden.includes(current)) select(visible()[0].id); // the open tab was just hidden
@@ -162,7 +180,8 @@ function playTray(frames, ms) {
 const START_FRAMES = [0, 1, 2, 3].map((i) => `start-${i}`);
 const PULSE_FRAMES = [0, 1].map((i) => `pulse-${i}`);
 
-const visible = () => services.filter((s) => !S.hidden.includes(s.id));
+// a service with no address yet (a self-hosted preset) has no page and no tab
+const visible = () => services.filter((s) => s.url && !S.hidden.includes(s.id));
 
 function updateSettings(patch) {
   for (const [k, v] of Object.entries(patch)) if (VALID[k]?.(v)) S[k] = v;
@@ -177,7 +196,7 @@ function buildAppMenu() {
     { role: 'appMenu' },
     { role: 'editMenu' },
     { label: T().menuServices, submenu: [
-      ...services.map((s, i) => ({ label: s.name, accelerator: `Cmd+${i + 1}`, click: () => select(s.id) })),
+      ...visible().map((s, i) => ({ label: s.name, accelerator: `Cmd+${i + 1}`, click: () => select(s.id) })),
       { type: 'separator' },
       { label: T().editServices, click: () => shell.openPath(servicesFile) },
     ] },
@@ -214,15 +233,20 @@ function toggleSettings() {
 
 function loadServices() {
   const file = path.join(app.getPath('userData'), 'services.json');
-  if (!fs.existsSync(file)) fs.writeFileSync(file, JSON.stringify(DEFAULTS, null, 2));
+  if (!fs.existsSync(file)) fs.writeFileSync(file, JSON.stringify([...DEFAULTS, ...HOMELAB.map(preset)], null, 2));
   servicesFile = file;
   try {
     services.push(...JSON.parse(fs.readFileSync(file, 'utf8')));
   } catch (e) {
+    servicesBroken = true;
     services.push(...DEFAULTS); // broken file (hand-edited): start anyway and warn
     new Notification({ title: 'Onebox', body: T().badServices.replace('{0}', e.message.slice(0, 80)) }).show();
   }
+  for (const h of HOMELAB) if (!services.some((s) => s.id === h.id)) services.push(preset(h));
 }
+// a broken file is left for the user to fix: saving now would replace it with the defaults
+let servicesBroken = false;
+const saveServices = () => servicesBroken || fs.writeFileSync(servicesFile, JSON.stringify(services, null, 2));
 
 // The arrow points at the cube, not the item's centre. Measured: x+21, x+23 when the count widens it past 50.
 const arrowFor = (t, winX) => Math.min(Math.max(Math.round(t.x + (t.width > 50 ? 23 : 21) - winX), R + 12), win.getSize()[0] - R - 12);
@@ -230,8 +254,8 @@ const arrowFor = (t, winX) => Math.min(Math.max(Math.round(t.x + (t.width > 50 ?
 function pushState() {
   if (win?.isVisible() && arrowX != null) arrowX = arrowFor(tray.getBounds(), win.getPosition()[0]); // the count changes the item width
   // a muted service counts neither on its tab nor next to the icon
-  const list = visible().map((s) => ({ id: s.id, name: s.name, color: colorOf(s.id), icon: favicons[s.id], unread: S.muted.includes(s.id) ? 0 : unread[s.id] || 0 }));
-  bar.webContents.send('state', { current, settingsOpen, arrowX, list, gearTitle: T().settings, dropSlot: T().dropSlot, parked: parked.length ? {
+  const list = visible().map((s) => ({ id: s.id, name: s.name, color: colorOf(s.id), icon: iconOf(s.id), server: onServer(s), unread: S.muted.includes(s.id) ? 0 : unread[s.id] || 0 }));
+  bar.webContents.send('state', { current, settingsOpen, arrowX, list, gearTitle: T().settings, addTitle: T().addService, dropSlot: T().dropSlot, parked: parked.length ? {
     label: parked.length > 1 ? T().nFiles.replace('{0}', parked.length) : parked[0].name,
     tip: parked.map((f) => [f.name, f.info].filter(Boolean).join(' · ')).join('\n'),
     thumbs: parked.slice(-3).map((f) => f.thumb), at: parkedAt,
@@ -266,6 +290,7 @@ function applyAudio() {
 }
 
 function addService(svc) {
+  if (!svc.url) return;
   const view = new WebContentsView({
     webPreferences: {
       partition: `persist:${svc.id}`, // separate cookies and logins per service
@@ -311,6 +336,7 @@ function addService(svc) {
   });
   // the number in the page title, "(3) WhatsApp", is the unread count
   wc.on('page-title-updated', (_e, title) => {
+    if (badged.has(svc.id)) return;
     const m = /^[(\[](\d+)[)\]]/.exec(title);
     unread[svc.id] = m ? Number(m[1]) : 0;
     pushState();
@@ -323,7 +349,7 @@ function addService(svc) {
   });
   wc.setAudioMuted(S.muted.includes(svc.id) && !(win?.isVisible() && svc.id === current));
   // web apps are wide: zoom out to fit the columns. Reapplied on every navigation, Chromium resets it
-  for (const ev of ['dom-ready', 'did-finish-load', 'did-navigate', 'did-navigate-in-page']) wc.on(ev, () => wc.setZoomFactor(S.zoom));
+  for (const ev of ['dom-ready', 'did-finish-load', 'did-navigate', 'did-navigate-in-page']) wc.on(ev, () => wc.setZoomFactor(zoomOf(svc.id)));
   if (new URL(svc.url).hostname === 'web.whatsapp.com') waWc = wc;
   wc.loadURL(svc.url);
   views[svc.id] = view;
@@ -331,6 +357,12 @@ function addService(svc) {
 
 ipcMain.on('select', (_e, id) => views[id] && select(id));
 ipcMain.on('gear', toggleSettings);
+// the bar's +: Settings, scrolled to the "add a service" card
+ipcMain.on('add-tab', (e) => {
+  if (e.sender !== bar.webContents) return;
+  if (!settingsOpen) toggleSettings();
+  settingsView.webContents.send('focus-add');
+});
 // the bar only knows the visible tabs: hidden ones keep their slots, the visible slots take the new order
 ipcMain.on('reorder', (e, ids) => {
   if (e.sender !== bar.webContents || !Array.isArray(ids)) return;
@@ -438,7 +470,12 @@ function installUpdate() {
 ipcMain.on('settings:update', (e) => fromFile(e) && downloadUpdate());
 ipcMain.on('settings:release', (e) => fromFile(e) && shell.openExternal(RELEASES));
 ipcMain.on('settings:install', (e) => fromFile(e) && installUpdate());
-const settingsPayload = () => ({ settings: S, t: T(), services: services.map(({ id, name }) => ({ id, name, color: colorOf(id), custom: id in S.colors })), icons: ICONS, version: app.getVersion(), latest, upd: { state: upd.state, pct: upd.pct }, canInstall: !!(asset && appBundle()) });
+// built-in services keep their address; self-hosted and added ones show it, editable
+const builtIn = (id) => DEFAULTS.some((d) => d.id === id);
+const homeOf = (id) => HOMELAB.find((h) => h.id === id);
+const settingsPayload = () => ({ settings: S, t: T(), services: services.map(({ id, name, url, allow = [], deny = [] }) => ({
+  id, name, url, allow, deny, builtIn: builtIn(id), icon: iconOf(id), color: colorOf(id), server: onServer({ id, url }), home: homeOf(id) ? { example: homeOf(id).example, https: !!homeOf(id).https } : null,
+})), icons: ICONS, version: app.getVersion(), latest, upd: { state: upd.state, pct: upd.pct }, canInstall: !!(asset && appBundle()) });
 ipcMain.handle('settings:get', (e) => (fromFile(e) ? settingsPayload() : null));
 ipcMain.handle('settings:set', (e, patch) => {
   if (!fromFile(e)) return null;
@@ -446,6 +483,61 @@ ipcMain.handle('settings:set', (e, patch) => {
   return settingsPayload();
 });
 ipcMain.on('settings:quit', (e) => fromFile(e) && app.quit());
+
+// Services edited from Settings: address, filters, add, remove. Written back to services.json.
+const okUrl = (u) => { try { return ['http:', 'https:'].includes(new URL(u).protocol); } catch { return false; } };
+const okList = (l) => Array.isArray(l) && l.length <= 50 && l.every((x) => typeof x === 'string' && x.length <= 200);
+function dropView(id) {
+  const v = views[id];
+  if (!v) return;
+  if (win.contentView.children.includes(v)) win.contentView.removeChildView(v);
+  v.webContents.close();
+  delete views[id];
+}
+const EDIT = {
+  url(svc, url) {
+    if (!okUrl(url)) return;
+    svc.url = url;
+    if (views[svc.id]) views[svc.id].webContents.loadURL(url); else { addService(svc); layout(); }
+    S.hidden = S.hidden.filter((x) => x !== svc.id); // giving an address means "show it"
+  },
+  filters(svc, allow, deny) { if (okList(allow) && okList(deny)) Object.assign(svc, { allow, deny }); },
+  remove(svc) {
+    if (builtIn(svc.id) || homeOf(svc.id) || visible().length < 2 && visible()[0] === svc) return;
+    dropView(svc.id);
+    services.splice(services.indexOf(svc), 1);
+  },
+};
+ipcMain.handle('services:edit', (e, op, id, ...args) => {
+  if (!fromFile(e)) return null;
+  const svc = services.find((s) => s.id === id);
+  if (op === 'add') {
+    const [url] = args, name = String(id || '').trim().slice(0, 40);
+    if (name && okUrl(url)) {
+      const base = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'app';
+      let nid = base;
+      for (let i = 2; services.some((s) => s.id === nid); i++) nid = `${base}-${i}`;
+      const s = { id: nid, name, url, allow: [], deny: [] };
+      services.push(s);
+      addService(s);
+      layout();
+    }
+  } else if (svc && EDIT[op]) EDIT[op](svc, ...args);
+  saveServices();
+  if (!views[current]) current = visible()[0].id; // the open tab was removed: the next one shows when Settings closes
+  updateSettings({}); // writes settings (hidden may have changed) and refreshes bar, menu and tabs
+  return settingsPayload();
+});
+
+// services that set navigator.setAppBadge (Telegram) count through it, not through the title
+const badged = new Set();
+ipcMain.on('badge', (e, n) => {
+  const svc = services.find((s) => views[s.id]?.webContents === e.sender);
+  if (!svc) return;
+  badged.add(svc.id);
+  unread[svc.id] = n;
+  pushState();
+});
 
 ipcMain.on('notify', (e, title, body) => {
   const svc = services.find((s) => views[s.id]?.webContents === e.sender);

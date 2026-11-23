@@ -10,31 +10,88 @@
   header small { display: block; opacity: .6; margin-top: 1px; }
   header .quit { margin-left: auto; display: flex; align-items: center; gap: 6px; }
   header .quit:hover { color: #ff6369; border-color: #ff6369; }
-  h3 { margin: 28px 0 6px; padding: 8px 12px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; border-left: 3px solid #ff9a52; border-radius: 0 7px 7px 0; background: rgba(255, 154, 82, .14); }
-  .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--line); }
+  h3 { margin: 24px 0 8px; padding: 8px 12px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; border-left: 3px solid #ff9a52; border-radius: 0 7px 7px 0; background: rgba(255, 154, 82, .14); }
+  /* each section is one card: the rows inside it read as a group, not as one long list */
+  .card { border-radius: 12px; background: color-mix(in srgb, var(--soft) 45%, transparent); padding: 0 14px; }
+  .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; padding: 6px 0; box-sizing: border-box; border-bottom: 1px solid var(--line); }
+  .card > .row:last-child { border-bottom: 0; }
+  .row > div > span[title] { cursor: help; }
+  /* a group of choices: one pill, the chosen one raised */
+  .seg { display: flex; padding: 2px; gap: 2px; border-radius: 9px; background: var(--soft); }
+  .seg button { border: 0; padding: 4px 11px; border-radius: 7px; opacity: .75; }
+  .seg button:hover { background: transparent; opacity: 1; }
+  .seg button.on { background: var(--bg); color: inherit; opacity: 1; font-weight: 600; box-shadow: 0 1px 3px rgba(20, 25, 60, .18); }
+  /* the service list's column titles, once instead of under every switch */
+  .cols { display: flex; justify-content: flex-end; gap: 14px; padding: 8px 0 0; font-size: 10.5px; opacity: .55; }
+  .cols { gap: 6px; }
+  .cols span, .cell { width: 72px; display: flex; justify-content: center; white-space: nowrap; flex: none; }
+  .ghost { border-color: transparent; opacity: .6; padding: 4px 8px; }
+  .ghost:hover { opacity: 1; }
+  .ghost.set { color: var(--accent); opacity: 1; font-weight: 600; }
   .opts { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
   button { font: inherit; color: inherit; border: 1px solid var(--line); background: transparent; border-radius: 7px; padding: 4px 10px; cursor: pointer; }
   button:hover { background: var(--soft); }
   button.on { background: var(--accent); border-color: transparent; color: #fff; }
-  .sw { width: 38px; height: 22px; border-radius: 11px; padding: 0; position: relative; background: var(--soft); border: 0; }
-  .sw::after { content: ''; position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: left .12s; }
-  .sw.on { background: #30a46c; } .sw.on::after { left: 18px; }
-  .ico { width: 40px; height: 32px; padding: 0; display: grid; place-items: center; }
+  .sw { width: 34px; height: 20px; flex: none; border-radius: 10px; padding: 0; position: relative; background: var(--soft); border: 0; }
+  .sw::after { content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: left .12s; }
+  .sw.on { background: #30a46c; } .sw.on::after { left: 16px; }
+  .ico { width: 34px; height: 26px; padding: 0; display: grid; place-items: center; }
   .ico img { width: 18px; height: 18px; }
   @media (prefers-color-scheme: dark) { .ico img { filter: invert(1); } }
-  .ico.on img { filter: invert(1); }
-  /* the tab colour: a swatch that opens a palette under the row (the macOS picker is a separate window: the panel would close on blur) */
-  .pick { display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 10px; opacity: .9; }
-  .dot { width: 22px; height: 22px; padding: 0; border-radius: 6px; border: 2px solid var(--bg); box-shadow: 0 0 0 1px var(--line); }
-  .dot:hover { transform: scale(1.12); background: var(--c); }
-  .dot.cur { box-shadow: 0 0 0 2px var(--text); }
-  .palette { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; align-items: center; padding: 8px 0 10px; border-bottom: 1px solid var(--line); }
+  .ico.on img { filter: none; }
+  @media (prefers-color-scheme: dark) { .ico.on img { filter: invert(1); } }
+  input[type=text] { font: inherit; color: inherit; background: transparent; border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; width: 100%; box-sizing: border-box; }
+  input[type=text]:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); }
+  .warn { color: #e5803a; opacity: 1; }
+  /* service rows: the app's icon, its name, the address underneath */
+  .svc { display: flex; align-items: center; gap: 12px; min-width: 0; }
+  .sico { width: 26px; height: 26px; flex: none; border-radius: 7px; object-fit: contain; }
+  i.sico { display: grid; place-items: center; background: var(--c); color: #fff; font: 800 13px -apple-system, sans-serif; font-style: normal; }
+  .row.tap { cursor: pointer; }
+  .row.tap:hover .svc > div > span { color: var(--accent); }
+  small.todo { color: var(--accent); opacity: 1; }
+  .svc small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 260px; }
+  /* popups: a card over the settings, the page dimmed behind it (a real window would close the panel on blur) */
+  .veil { position: fixed; inset: 0; z-index: 9; display: grid; place-items: center; padding: 20px; background: rgba(18, 20, 32, .32); backdrop-filter: blur(5px); animation: fade .18s ease-out; }
+  .pop { position: relative; width: min(460px, 100%); max-height: calc(100vh - 40px); overflow-y: auto; box-sizing: border-box; padding: 22px 22px 18px; border-radius: 16px; background: var(--bg); box-shadow: 0 24px 60px rgba(10, 12, 30, .35), 0 0 0 1px var(--line); animation: rise .26s cubic-bezier(.2, .9, .3, 1.15); }
+  .pop .head { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+  .pop .head .sico { width: 40px; height: 40px; border-radius: 10px; }
+  .pop .head i.sico { font-size: 18px; }
+  .pop .head b { font-size: 17px; letter-spacing: -.01em; }
+  .pop .x { position: absolute; top: 12px; right: 12px; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 50%; font-size: 15px; opacity: .55; }
+  .pop .x:hover { opacity: 1; }
+  .step { padding: 12px 0; }
+  .head + .step { border-top: 1px solid var(--line); }
+  .or { display: flex; align-items: center; gap: 10px; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; opacity: .5; }
+  .or::before, .or::after { content: ''; flex: 1; height: 1px; background: var(--text); opacity: .25; }
+  .step b { display: block; font-size: 13px; margin-bottom: 2px; }
+  .step span { font-size: 12px; opacity: .72; line-height: 1.45; }
+  .cmd { display: flex; align-items: center; gap: 6px; margin-top: 6px; padding: 5px 6px 5px 10px; border-radius: 8px; background: var(--soft); font: 12px ui-monospace, monospace; }
+  .cmd code { flex: 1; overflow-x: auto; white-space: nowrap; }
+  .cmd button { flex: none; padding: 2px 8px; font: 11px -apple-system, sans-serif; }
+  .pop .foot { display: flex; gap: 8px; align-items: center; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
+  .pop .foot input { flex: 1; }
+  .pop .foot button.on { padding: 7px 16px; font-weight: 600; }
+  .pop label { display: flex; align-items: center; gap: 8px; margin: 14px 0 6px; font-weight: 600; }
+  @keyframes fade { from { opacity: 0; } }
+  @keyframes rise { from { opacity: 0; transform: translateY(14px) scale(.97); } }
+  /* add a service: a card that stands out, the bar's + scrolls here */
+  .addc { margin: 10px 0 4px; padding: 14px; border-radius: 12px; border: 1.5px dashed color-mix(in srgb, var(--accent) 45%, transparent); background: color-mix(in srgb, var(--accent) 6%, transparent); }
+  .addc .t { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .addc .plus { width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; background: var(--accent); color: #fff; font-size: 17px; }
+  .addc .t b { display: block; }
+  .addc .f { display: flex; gap: 8px; }
+  .addc .f input:first-child { flex: 0 0 34%; }
+  .addc .f button { flex: none; padding: 7px 16px; font-weight: 600; }
+  .addc.flash { animation: flash 1.2s ease-out; }
+  @keyframes flash { 0%, 40% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 35%, transparent); } }
   input[type=time] { font: inherit; color: inherit; background: transparent; border: 1px solid var(--line); border-radius: 7px; padding: 3px 6px; }
   small { opacity: .6; display: block; margin-top: 2px; }
   /* full width, flush with the bottom: the dusk colours of the README screenshots, a bit lighter */
   footer { margin: 32px -28px 0; padding: 22px 28px; text-align: center; font-weight: 600; color: #fff; background: linear-gradient(135deg, #2f3350 0%, #6b4a5a 50%, #e39a6a 100%); }
 </style>
 <div id="app"></div>
+<div id="pop"></div>
 <script>
   const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
   const ZOOMS = [[1, '100%'], [0.9, '90%'], [0.8, '80%'], [0.7, '70%'], [0.6, '60%']];
@@ -43,44 +100,124 @@
   const apply = (p) => ({ settings: S, services: SV, icons: ICONS, version: VERSION, latest: LATEST, upd: UPD, canInstall: CAN, t } = p);
 
   const set = async (patch) => { apply(await settings.set(patch)); render(); };
-  const opts = (list, cur, key) => { const d = el('div', 'opts'); for (const [v, label] of list) { const b = el('button', v === cur ? 'on' : '', label); b.onclick = () => set({ [key]: v }); d.append(b); } return d; };
+  const opts = (list, cur, key) => { const d = el('div', 'seg'); for (const [v, label] of list) { const b = el('button', v === cur ? 'on' : '', label); b.onclick = () => set({ [key]: v }); d.append(b); } return d; };
   const sw = (on, fn) => { const b = el('button', `sw${on ? ' on' : ''}`); b.onclick = fn; return b; };
-  const row = (label, ctrl, hint) => { const r = el('div', 'row'); const l = el('div'); l.append(el('span', '', label)); if (hint) l.append(el('small', '', hint)); r.append(l, ctrl); return r; };
+  // the hint is a tooltip on the label: one line per setting, the explanation when you ask for it
+  const row = (label, ctrl, hint) => { const r = el('div', 'row'); const l = el('div'), sp = el('span', '', label); if (hint) sp.title = hint; l.append(sp); r.append(l, ctrl); return r; };
+  const card = (...rows) => { const c = el('div', 'card'); c.append(...rows); return c; };
 
-  const toggle = (caption, on, fn) => { const w = el('label'); w.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:3px;font-size:10px;opacity:.9'; w.append(sw(on, fn), el('span', '', caption)); return w; };
-  const PALETTE = ['#25D366', '#84CC16', '#EAB308', '#F97316', '#EF4444', '#E01E5A', '#D946EF', '#A855F7', '#6D4AFF', '#5865F2', '#0A66C2', '#2AABEE', '#14B8A6', '#64748B'];
-  let picking = null; // service whose palette is open
-  const dot = (c, cls) => { const b = el('button', `dot${cls ? ` ${cls}` : ''}`); b.style.background = c; b.style.setProperty('--c', c); return b; };
-  const colorCtl = (s) => {
-    const w = el('div', 'pick'), b = dot(s.color);
-    b.onclick = () => { picking = picking === s.id ? null : s.id; render(); };
-    w.append(b, el('span', '', t.color));
-    return w;
+  // each switch sits in a fixed-width cell, the same width as its column title above
+  const toggle = (caption, on, fn) => { const c = el('div', 'cell'), b = sw(on, fn); b.title = caption; c.append(b); return c; };
+  const edit = async (...a) => { apply(await settings.edit(...a)); render(); };
+  const input = (value, placeholder, onchange) => { const i = el('input'); i.type = 'text'; i.value = value; i.placeholder = placeholder; i.spellcheck = false; if (onchange) i.onchange = () => onchange(i.value.trim()); return i; };
+  // Bitwarden's vault encrypts with WebCrypto, which browsers give only to https pages (and localhost)
+  const insecure = (s) => s.home?.https && /^http:/.test(s.url) && !/^http:\/\/(localhost|127\.0\.0\.1)[:/]/.test(s.url);
+  // filters are edited as comma-separated words; each one is a case-insensitive regex, so a plain word works
+  const words = (v) => v.split(',').map((x) => x.trim()).filter(Boolean);
+  const icon = (s) => {
+    if (s.icon) { const i = el('img', 'sico'); i.src = s.icon; i.onerror = () => i.replaceWith(letter(s)); return i; }
+    return letter(s);
   };
-  const palette = (s) => {
-    const d = el('div', 'palette');
-    for (const c of PALETTE) {
-      const b = dot(c, c.toLowerCase() === s.color.toLowerCase() ? 'cur' : '');
-      b.onclick = () => { picking = null; set({ colors: { ...S.colors, [s.id]: c } }); };
-      d.append(b);
-    }
-    if (s.custom) {
-      const r = el('button', '', `↺ ${t.resetColor}`);
-      r.onclick = () => { picking = null; const { [s.id]: _, ...rest } = S.colors; set({ colors: rest }); };
-      d.append(r);
-    }
+  const letter = (s) => { const i = el('i', 'sico', s.name[0]); i.style.setProperty('--c', s.color); return i; };
+
+  // one popup at a time; it lives outside #app so a re-render underneath doesn't close it
+  let popId = null, popKind = null;
+  const closePop = () => { popId = popKind = null; document.getElementById('pop').replaceChildren(); };
+  function showPop(kind, s) {
+    popKind = kind; popId = s.id;
+    const card = el('div', 'pop');
+    const x = el('button', 'x', '✕'); x.onclick = closePop;
+    const head = el('div', 'head'), ht = el('div');
+    ht.append(el('b', '', (kind === 'filters' ? t.filtersTitle : t.connectTitle).replace('{0}', s.name)));
+    if (kind === 'filters') ht.append(el('small', '', t.filtersHint));
+    head.append(icon(s), ht);
+    card.append(x, head, ...(kind === 'filters' ? filtersBody(s) : connectBody(s)));
+    const veil = el('div', 'veil');
+    veil.onclick = (e) => e.target === veil && closePop();
+    veil.append(card);
+    document.getElementById('pop').replaceChildren(veil);
+    card.querySelector('input')?.focus();
+  }
+  const cmd = (text) => {
+    const d = el('div', 'cmd'), b = el('button', '', t.copy);
+    b.onclick = () => navigator.clipboard.writeText(text).then(() => { b.textContent = '✓'; setTimeout(() => (b.textContent = t.copy), 1200); });
+    d.append(el('code', '', text), b);
     return d;
   };
-  const serviceCtl = (s) => {
-    const hidden = S.hidden.includes(s.id), muted = S.muted.includes(s.id);
-    const d = el('div', 'opts'); d.style.gap = '16px';
-    d.append(
-      toggle(t.visible, !hidden, () => set({ hidden: hidden ? S.hidden.filter((x) => x !== s.id) : [...S.hidden, s.id] })),
+  // ways to connect, not steps in a row: no numbers, an "or" between them
+  const step = (title, text, ...extra) => {
+    const d = el('div', 'step');
+    d.append(el('b', '', title), el('span', '', text), ...extra);
+    return d;
+  };
+  function connectBody(s) {
+    const ex = s.home?.example || 'https://…';
+    // https-only apps (Bitwarden) get the one way that works; the others, at home and away
+    const out = !s.home ? [] : s.home.https
+      ? [step(t.gHttps, t.gHttpsText, cmd('tailscale serve --bg 8080'), el('span', '', t.gThen), cmd(ex), el('span', '', t.gCloud))]
+      : [step(t.gHome, t.gHomeText, cmd(ex)), el('div', 'or', t.or), step(t.gAway, t.gAwayText, cmd(ex.replace('192.168.1.10', '100.x.y.z')))];
+    const foot = el('div', 'foot');
+    const addr = input(s.url, ex);
+    const go = el('button', 'on', s.url ? t.save : t.connect);
+    const warn = el('small', 'warn', insecure(s) ? t.needsHttps : '');
+    const send = () => { const v = addr.value.trim(); if (!v) return; edit('url', s.id, v).then(() => { const n = SV.find((x) => x.id === s.id); if (insecure(n)) warn.textContent = t.needsHttps; else closePop(); }); };
+    go.onclick = send;
+    addr.onkeydown = (e) => { if (e.key === 'Enter') send(); }; // an arrow returning false would swallow every key
+    foot.append(addr, go);
+    return [...out, foot, warn];
+  }
+  function filtersBody(s) {
+    const allow = input(s.allow.join(', '), t.allowEx), deny = input(s.deny.join(', '), t.denyEx);
+    const done = el('button', 'on', t.done);
+    done.onclick = () => edit('filters', s.id, words(allow.value), words(deny.value)).then(closePop);
+    const foot = el('div', 'foot'); foot.style.justifyContent = 'flex-end'; foot.append(done);
+    return [el('label', '', t.allow), allow, el('label', '', t.deny), deny, foot];
+  }
+
+  const cols = () => { const d = el('div', 'cols'); d.title = t.servicesHint; d.append(el('span', '', t.visible), el('span', '', t.notifications)); return d; };
+  function serviceRow(s) {
+    const hidden = S.hidden.includes(s.id) || !s.url, muted = S.muted.includes(s.id);
+    const left = el('div', 'svc'), txt = el('div');
+    txt.append(el('span', '', s.name));
+    if (!s.builtIn) txt.append(el('small', insecure(s) ? 'warn' : s.url ? '' : 'todo', s.url ? s.url.replace(/^https?:\/\//, '').replace(/\/$/, '') : t.notConnected));
+    left.append(icon(s), txt);
+    const nf = s.allow.length + s.deny.length;
+    const ctl = el('div', 'opts'); ctl.style.gap = '6px'; ctl.style.alignItems = 'center'; ctl.style.flexWrap = 'nowrap';
+    const f = el('button', nf ? 'ghost set' : 'ghost', nf ? `${t.filters} · ${nf}` : t.filters);
+    f.onclick = () => showPop('filters', s);
+    ctl.append(f);
+    if (!s.builtIn && !s.home) { const x = el('button', 'ghost', '✕'); x.title = t.remove; x.onclick = () => edit('remove', s.id); ctl.append(x); }
+    ctl.append(
+      // no address yet: the switch opens the connect popup instead
+      toggle(t.visible, !hidden, () => (s.url ? set({ hidden: hidden ? S.hidden.filter((x) => x !== s.id) : [...S.hidden, s.id] }) : showPop('connect', s))),
       toggle(t.notifications, !muted, () => set({ muted: muted ? S.muted.filter((x) => x !== s.id) : [...S.muted, s.id] })),
-      colorCtl(s),
     );
+    const r = el('div', 'row'); r.dataset.id = s.id; r.append(left, ctl);
+    // apps with an address of their own: the whole row opens the connect popup (its switches and buttons stay theirs)
+    if (!s.builtIn) { r.classList.add('tap'); r.onclick = (e) => e.target.closest('button') || showPop('connect', s); }
+    return r;
+  }
+  function addCard() {
+    const d = el('div', 'addc'); d.id = 'add';
+    const top = el('div', 't'), tt = el('div');
+    tt.append(el('b', '', t.addTitle), el('small', '', t.addSub));
+    top.append(el('div', 'plus', '+'), tt);
+    const n = input('', t.addName), u = input('', 'https://…');
+    const b = el('button', 'on', t.add);
+    const go = () => n.value.trim() && u.value.trim() && edit('add', n.value.trim(), u.value.trim());
+    b.onclick = go;
+    u.onkeydown = (e) => { if (e.key === 'Enter') go(); };
+    const f = el('div', 'f'); f.append(n, u, b);
+    d.append(top, f);
     return d;
-  };
+  }
+  settings.onFocusAdd(() => {
+    const c = document.getElementById('add');
+    if (!c) return;
+    c.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    c.classList.remove('flash'); void c.offsetWidth; c.classList.add('flash');
+    c.querySelector('input').focus({ preventScroll: true });
+  });
 
   const updateBtn = () => {
     const f = (k) => t[k].replace('{0}', LATEST);
@@ -120,25 +257,32 @@
       header(),
       ...(LATEST ? [row(t.updateAvailable.replace('{0}', LATEST), updateBtn(), t.updateHint)] : []),
       el('h3', '', t.secLook),
-      row(t.theme, opts(THEMES, S.theme, 'theme')),
-      row(t.width, opts(WIDTHS, S.width, 'width'), t.widthHint),
-      row(t.zoom, opts(ZOOMS, S.zoom, 'zoom'), t.zoomHint),
-      row(t.icon, icons),
-      row(t.animate, sw(S.animate, () => set({ animate: !S.animate })), t.animateHint),
-      row(t.count, sw(S.showCount, () => set({ showCount: !S.showCount }))),
-      row(t.updateBadge, sw(S.updateBadge, () => set({ updateBadge: !S.updateBadge })), t.updateBadgeHint),
+      card(
+        row(t.theme, opts(THEMES, S.theme, 'theme')),
+        row(t.width, opts(WIDTHS, S.width, 'width'), t.widthHint),
+        row(t.zoom, opts(ZOOMS, S.zoom, 'zoom'), t.zoomHint),
+        row(t.icon, icons),
+        row(t.animate, sw(S.animate, () => set({ animate: !S.animate })), t.animateHint),
+        row(t.count, sw(S.showCount, () => set({ showCount: !S.showCount }))),
+        row(t.updateBadge, sw(S.updateBadge, () => set({ updateBadge: !S.updateBadge })), t.updateBadgeHint),
+      ),
       el('h3', '', t.secNotif),
-      row(t.notif, sw(S.notifications, () => set({ notifications: !S.notifications }))),
-      row(t.quiet, quietCtl, t.quietHint),
+      card(
+        row(t.notif, sw(S.notifications, () => set({ notifications: !S.notifications }))),
+        row(t.quiet, quietCtl, t.quietHint),
+      ),
       el('h3', '', t.secServices),
-      el('small', '', t.servicesHint),
-      ...SV.flatMap((s) => [row(s.name, serviceCtl(s)), ...(picking === s.id ? [palette(s)] : [])]),
+      // one list: the cloud apps first, then your server's (the tab bar keeps the same order)
+      card(cols(), ...SV.map(serviceRow)),
+      addCard(),
       el('h3', '', t.secGeneral),
-      row(t.language, opts(LANGS, S.lang, 'lang')),
-      row(t.login, sw(S.launchAtLogin, () => set({ launchAtLogin: !S.launchAtLogin }))),
-      row(t.clearCache, sw(S.clearCacheOnQuit, () => set({ clearCacheOnQuit: !S.clearCacheOnQuit })), t.clearCacheHint),
-      row(t.blur, sw(S.closeOnBlur, () => set({ closeOnBlur: !S.closeOnBlur }))),
-      row(t.shortcut, opts(SHORT, S.shortcut, 'shortcut'), t.shortcutHint),
+      card(
+        row(t.language, opts(LANGS, S.lang, 'lang')),
+        row(t.login, sw(S.launchAtLogin, () => set({ launchAtLogin: !S.launchAtLogin }))),
+        row(t.clearCache, sw(S.clearCacheOnQuit, () => set({ clearCacheOnQuit: !S.clearCacheOnQuit })), t.clearCacheHint),
+        row(t.blur, sw(S.closeOnBlur, () => set({ closeOnBlur: !S.closeOnBlur }))),
+        row(t.shortcut, opts(SHORT, S.shortcut, 'shortcut'), t.shortcutHint),
+      ),
       el('footer', '', `Onebox v${VERSION} · open source`),
     );
   }
