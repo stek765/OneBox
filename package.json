@@ -1,6 +1,6 @@
 {
   "name": "onebox",
-  "version": "0.3.11",
+  "version": "0.3.12",
   "private": true,
   "main": "main.js",
   "license": "MIT",

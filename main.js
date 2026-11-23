@@ -7,12 +7,12 @@ const path = require('path');
 const { passes, inQuiet } = require('./filter');
 const STR = require('./i18n');
 
-// two copies would fight over one profile (WhatsApp shows its QR): the second just opens the first's panel
+// one profile, one instance: a second launch opens the first one's panel
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) app.quit();
-// other apps can bring a tab to the front: open -n -a Onebox --args --open=whatsapp
+// open -n -a Onebox --args --open=<id> brings a tab to the front
 const asked = (argv) => visible().find((s) => argv.includes(`--open=${s.id}`))?.id;
-// open -n -a Onebox --args --url=<link>: the tab of that site loads it, a link no tab owns goes to the browser
+// --url=<link> opens in the tab that owns its site, else in the browser
 const wanted = (argv) => argv.find((a) => a.startsWith('--url='))?.slice(6);
 app.on('second-instance', (_e, argv) => {
   if (!win) return;
@@ -30,7 +30,7 @@ function openLink(link) {
   showPanel();
 }
 
-// Default services, copied to services.json on first run. allow/deny are case-insensitive regexes tested on "title\nbody".
+// Copied to services.json on first run. allow/deny: case-insensitive regexes tested on "title\nbody".
 const DEFAULTS = [
   { id: 'whatsapp', name: 'WhatsApp', url: 'https://web.whatsapp.com', allow: [], deny: [] },
   { id: 'telegram', name: 'Telegram', url: 'https://web.telegram.org/a/', allow: [], deny: [] },
@@ -39,8 +39,7 @@ const DEFAULTS = [
   { id: 'proton', name: 'Proton', url: 'https://mail.proton.me', allow: [], deny: [] },
   { id: 'linkedin', name: 'LinkedIn', url: 'https://www.linkedin.com/messaging/', allow: [], deny: [] },
 ];
-// Self-hosted apps: always listed, off until the user gives the address of their own server (Settings › Services).
-// Added to existing services.json files too, so an update brings them.
+// Self-hosted apps: off until the user enters their server's address. Added to existing services.json files too.
 const HOMELAB = [
   { id: 'navidrome', name: 'Navidrome', example: 'http://192.168.1.10:4533' },
   { id: 'jellyfin', name: 'Jellyfin', example: 'http://192.168.1.10:8096' },
@@ -54,7 +53,7 @@ const preset = ({ id, name }) => ({ id, name, url: '', allow: [], deny: [] });
 const BAR = 48; // tab strip height
 const AR = 10; // arrow height
 const R = 12; // corner radius
-const F = 6; // the bar's dark goes on around the page as a frame: Onebox holds the page, not the other way round
+const F = 6; // dark frame around the page
 // sites refuse a browser that says "Electron"
 const UA = `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${process.versions.chrome} Safari/537.36`;
 
@@ -62,12 +61,12 @@ const major = process.versions.chrome.split('.')[0];
 const CH_UA = `"Chromium";v="${major}", "Google Chrome";v="${major}", "Not;A=Brand";v="8"`;
 
 let win, bar, tray, settingsView, servicesFile, current, settingsOpen = false, arrowX = null;
-let parked = [], parkedIcon = null, parkedAt = 0; // files dropped on the tray icon, stacked until dragged into a chat
-let halo, haloTimer; // "drop here" pill under the icon while a file is dragged over it
+let parked = [], parkedIcon = null, parkedAt = 0; // files dropped on the icon, until dragged into a chat
+let halo, haloTimer; // "drop here" pill under the icon
 const services = [];
 const views = {}; // service id -> WebContentsView
 const unread = {};
-const favicons = {}; // each tab wears its site's own icon, as the page declares it
+const favicons = {};
 const BEST_ICON = `(() => {
   const score = (e) => /\\.svg(\\?|$)/i.test(e.href) || e.type === 'image/svg+xml' || /\\bany\\b/.test(e.getAttribute('sizes') || '') ? 1e4
     : Math.max(0, ...(e.getAttribute('sizes') || '').split(/\\s+/).map((x) => parseInt(x) || 0));
@@ -75,7 +74,7 @@ const BEST_ICON = `(() => {
   return icons.sort((a, b) => b[0] - a[0])[0]?.[1] || '';
 })()`;
 
-// settings.json. Every key has a validator: nothing else gets in from the renderer.
+// settings.json: every key is validated, nothing else gets in from the renderer
 const ICONS = [['cubo', 'Cubo'], ['pieno', 'Pieno'], ['contorno', 'Contorno'], ['aperto', 'Aperto']];
 const SHORTCUTS = ['', 'Alt+Cmd+O', 'Ctrl+Alt+Space'];
 const bool = (v) => typeof v === 'boolean';
@@ -94,8 +93,10 @@ const VALID = {
   shortcut: (v) => SHORTCUTS.includes(v),
   lang: (v) => v in STR,
   order: (v) => Array.isArray(v) && v.length <= 200 && v.every((x) => typeof x === 'string'),
+  server: (v) => v && typeof v === 'object' && !Array.isArray(v) && Object.values(v).every(bool),
+  serverOpen: bool,
 };
-const SET_DEFAULTS = { theme: 'light', notifications: true, quiet: { on: false, from: '22:00', to: '08:00' }, muted: [], hidden: [], icon: 'cubo', launchAtLogin: false, closeOnBlur: true, showCount: true, lang: 'en', shortcut: '', zoom: 0.8, width: 820, clearCacheOnQuit: true, animate: true, updateBadge: true, order: [] };
+const SET_DEFAULTS = { theme: 'light', notifications: true, quiet: { on: false, from: '22:00', to: '08:00' }, muted: [], hidden: [], icon: 'cubo', launchAtLogin: false, closeOnBlur: true, showCount: true, lang: 'en', shortcut: '', zoom: 0.8, width: 820, clearCacheOnQuit: true, animate: true, updateBadge: true, order: [], server: {}, serverOpen: true };
 let S = SET_DEFAULTS;
 const T = () => STR[S.lang];
 const setFile = () => path.join(app.getPath('userData'), 'settings.json');
@@ -103,13 +104,10 @@ const fromFile = (e) => e.senderFrame.url.startsWith('file:');
 
 function loadSettings() {
   try { S = { ...SET_DEFAULTS, ...JSON.parse(fs.readFileSync(setFile(), 'utf8')) }; } catch { S = { ...SET_DEFAULTS }; }
-  // stale or invalid values fall back to the default
   for (const k of Object.keys(SET_DEFAULTS)) if (VALID[k] && !VALID[k](S[k])) S[k] = SET_DEFAULTS[k];
 }
 
-// The order lives in settings.json, not services.json: that file is hand-edited, and a drag
-// rewriting it would reformat it under the user. Ids not in the list keep their file order, at the end.
-// Tab colours: the brand's, else a steady hue from the id so a tab added later is never grey.
+// Tab colour: the brand's, else a hue derived from the id.
 const BRAND = { whatsapp: '#25D366', telegram: '#2AABEE', slack: '#E01E5A', discord: '#5865F2', proton: '#6D4AFF', linkedin: '#0A66C2' };
 const hslHex = (h, s = 0.58, l = 0.5) => '#' + [0, 8, 4].map((n) => {
   const k = (n + h / 30) % 12;
@@ -117,20 +115,22 @@ const hslHex = (h, s = 0.58, l = 0.5) => '#' + [0, 8, 4].map((n) => {
 }).join('');
 const colorOf = (id) => BRAND[id] || hslHex([...id].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 7));
 
-// Your own server's apps sit apart from the cloud ones, after a divider: the presets, and any added app
-// whose address is private (home network, Tailscale, .local)
+// Apps on the user's own server (presets, a private address, or moved there by hand) come after the cloud ones.
 const PRIVATE = /^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.)|\.(local|lan|home|internal|ts\.net)$/;
 const hostOf = (u) => { try { return new URL(u).hostname; } catch { return ''; } };
-const onServer = (s) => !!homeOf(s.id) || (!builtIn(s.id) && PRIVATE.test(hostOf(s.url)));
-// presets wear their project's logo (assets/services, from dashboard-icons, Apache-2.0); other tabs their site's icon
-const iconOf = (id) => (homeOf(id) ? `assets/services/${id}.svg` : favicons[id]);
+const autoServer = (s) => !!homeOf(s.id) || (!builtIn(s.id) && PRIVATE.test(hostOf(s.url)));
+const onServer = (s) => S.server[s.id] ?? autoServer(s);
+// bundled logos (assets/services: dashboard-icons, Apache-2.0; WhatsApp from Simple Icons, CC0), else the site's favicon
+const BUNDLED = new Set(fs.readdirSync(path.join(__dirname, 'assets/services')).map((f) => path.basename(f, '.svg')));
+const iconOf = (id) => (BUNDLED.has(id) ? `assets/services/${id}.svg` : favicons[id]);
 
+// Tab order lives in settings.json, so a drag never rewrites the hand-edited services.json.
 const sortServices = () => {
   const at = (s) => { const i = S.order.indexOf(s.id); return (onServer(s) ? 1e6 : 0) + (i < 0 ? 1e5 : i); };
   services.sort((a, b) => at(a) - at(b)); // stable: unlisted ones stay in file order
 };
 
-// a service can set its own "zoom" in services.json (e.g. a wide web app); else the global one
+// a per-service "zoom" in services.json, else the global one
 const zoomOf = (id) => services.find((s) => s.id === id)?.zoom ?? S.zoom;
 
 function applySettings() {
@@ -149,8 +149,7 @@ function applySettings() {
   pushState();
 }
 
-// Clears Cache Storage (seen photos and files). The HTTP cache holds each site's code: wiping it cost
-// WhatsApp ~10 MB and ~8 s per start. IndexedDB holds the logins.
+// Cache Storage only: the HTTP cache holds each site's code (WhatsApp: ~10 MB and ~8 s per start).
 const clearCaches = () => Promise.all(Object.values(views).map((v) =>
   v.webContents.session.clearStorageData({ storages: ['cachestorage'] })));
 let cleaned = false;
@@ -162,9 +161,9 @@ app.on('before-quit', (e) => {
   Promise.race([clearCaches().catch(() => {}), new Promise((r) => setTimeout(r, 3000))]).finally(() => app.quit());
 });
 
-// Tray animations (Cube icon only): frames from assets/, one every `ms`, then back to rest
+// tray animation frames, Cube icon only
 const trayImage = (name) => nativeImage.createFromPath(path.join(__dirname, 'assets', `${name}Template@2x.png`));
-// the resting icon: soft orange (not a template, macOS keeps the colour) while an update is waiting
+// orange (not a template image) while an update is waiting
 const restIcon = () => (latest && S.updateBadge ? nativeImage.createFromPath(path.join(__dirname, 'assets', `${S.icon}-orange@2x.png`)) : trayImage(S.icon));
 let animating = false;
 let waWc = null;
@@ -180,13 +179,13 @@ function playTray(frames, ms) {
 const START_FRAMES = [0, 1, 2, 3].map((i) => `start-${i}`);
 const PULSE_FRAMES = [0, 1].map((i) => `pulse-${i}`);
 
-// a service with no address yet (a self-hosted preset) has no page and no tab
+// a preset without an address has no tab
 const visible = () => services.filter((s) => s.url && !S.hidden.includes(s.id));
 
 function updateSettings(patch) {
   for (const [k, v] of Object.entries(patch)) if (VALID[k]?.(v)) S[k] = v;
   fs.writeFileSync(setFile(), JSON.stringify(S, null, 2));
-  // only when that switch changes: every registration makes macOS show a "login item added" notice
+  // only on change: each registration makes macOS show a notice
   if ('launchAtLogin' in patch) app.setLoginItemSettings({ openAtLogin: S.launchAtLogin });
   applySettings();
 }
@@ -205,8 +204,8 @@ function buildAppMenu() {
 
 const togglePanel = () => (win.isVisible() ? win.hide() : showPanel());
 
-// Dragging a file in starts with a click in Finder, which blurs the panel. Wait for the mouse button
-// to be released (Electron can't read it, AppKit can): released over the panel = a drop, keep it open.
+// Dragging a file in from Finder blurs the panel: stay open if the button is released over it.
+// Electron can't read the mouse button, AppKit can.
 function hideUnlessDrop() {
   const js = "ObjC.import('AppKit'); const was = $.NSEvent.pressedMouseButtons & 1; while ($.NSEvent.pressedMouseButtons & 1) delay(0.03); was ? 'down' : ''";
   execFile('osascript', ['-l', 'JavaScript', '-e', js], (_err, out) => {
@@ -217,8 +216,7 @@ function hideUnlessDrop() {
   });
 }
 
-// Only the page on screen is attached to the window. Hidden views stacked under it still took part in the
-// cursor updates, so on every mouse move the hand flickered to an arrow.
+// Only the visible view is attached: hidden ones still took cursor updates and made it flicker.
 function attach(v) {
   for (const x of [...Object.values(views), settingsView]) if (x !== v && win.contentView.children.includes(x)) win.contentView.removeChildView(x);
   if (!win.contentView.children.includes(v)) win.contentView.addChildView(v);
@@ -244,18 +242,17 @@ function loadServices() {
   }
   for (const h of HOMELAB) if (!services.some((s) => s.id === h.id)) services.push(preset(h));
 }
-// a broken file is left for the user to fix: saving now would replace it with the defaults
+// a broken file stays for the user to fix, never overwritten with the defaults
 let servicesBroken = false;
 const saveServices = () => servicesBroken || fs.writeFileSync(servicesFile, JSON.stringify(services, null, 2));
 
-// The arrow points at the cube, not the item's centre. Measured: x+21, x+23 when the count widens it past 50.
+// the arrow points at the cube: x+21, or x+23 when the count widens the item past 50
 const arrowFor = (t, winX) => Math.min(Math.max(Math.round(t.x + (t.width > 50 ? 23 : 21) - winX), R + 12), win.getSize()[0] - R - 12);
 
 function pushState() {
   if (win?.isVisible() && arrowX != null) arrowX = arrowFor(tray.getBounds(), win.getPosition()[0]); // the count changes the item width
-  // a muted service counts neither on its tab nor next to the icon
   const list = visible().map((s) => ({ id: s.id, name: s.name, color: colorOf(s.id), icon: iconOf(s.id), server: onServer(s), unread: S.muted.includes(s.id) ? 0 : unread[s.id] || 0 }));
-  bar.webContents.send('state', { current, settingsOpen, arrowX, list, gearTitle: T().settings, addTitle: T().addService, dropSlot: T().dropSlot, parked: parked.length ? {
+  bar.webContents.send('state', { current, settingsOpen, arrowX, list, gearTitle: T().settings, addTitle: T().addService, serverOpen: S.serverOpen, serverFold: T().serverFold, serverOpenTip: T().serverUnfold, dropSlot: T().dropSlot, parked: parked.length ? {
     label: parked.length > 1 ? T().nFiles.replace('{0}', parked.length) : parked[0].name,
     tip: parked.map((f) => [f.name, f.info].filter(Boolean).join(' · ')).join('\n'),
     thumbs: parked.slice(-3).map((f) => f.thumb), at: parkedAt,
@@ -269,7 +266,7 @@ function pushState() {
 function layout() {
   const [w, h] = win.getContentSize();
   const top = AR + BAR;
-  // the bar's view lies behind the whole panel: its dark shows above the page and as a thin frame around it
+  // the bar's view spans the panel: its dark shows above and around the page
   bar.setBounds({ x: 0, y: 0, width: w, height: h });
   for (const v of [...Object.values(views), settingsView]) v.setBounds({ x: F, y: top, width: w - 2 * F, height: h - top - F });
 }
@@ -283,7 +280,7 @@ function select(id) {
   pushState();
 }
 
-// a muted service stays silent in the background, but the tab in front of you plays (videos, voice notes)
+// a muted tab is silent in the background but plays while open
 function applyAudio() {
   const open = win?.isVisible();
   for (const [id, v] of Object.entries(views)) v.webContents.setAudioMuted(S.muted.includes(id) && !(open && id === current));
@@ -300,7 +297,7 @@ function addService(svc) {
       backgroundThrottling: false, // otherwise background tabs stop receiving messages
     },
   });
-  view.setBorderRadius(R - F); // concentric with the frame's outer corner
+  view.setBorderRadius(R - F);
   const wc = view.webContents;
   wc.setUserAgent(UA);
   // Google rejects sign-in when "Google Chrome" is missing from the brands
@@ -310,7 +307,7 @@ function addService(svc) {
     h['sec-ch-ua'] = CH_UA;
     cb({ requestHeaders: h });
   });
-  // calls, copy buttons and video fullscreen work; reading the clipboard, location etc. denied
+  // reading the clipboard, location etc. stays denied
   const ALLOW = ['notifications', 'media', 'display-capture', 'clipboard-sanitized-write', 'fullscreen'];
   wc.session.setPermissionRequestHandler((_w, perm, cb) => cb(ALLOW.includes(perm)));
   // screen sharing: macOS 15+ shows its own picker; older systems share the main screen
@@ -341,14 +338,14 @@ function addService(svc) {
     unread[svc.id] = m ? Number(m[1]) : 0;
     pushState();
   });
-  // the first icon a page reports is often its 16 px one, blurry on the tab: a vector one if declared, else the largest sized one
+  // the first reported icon is often 16 px: prefer a vector one, else the largest
   wc.on('page-favicon-updated', async (_e, f) => {
     const best = await wc.executeJavaScript(BEST_ICON).catch(() => '');
     const icon = best || f[0];
     if (icon && icon !== favicons[svc.id]) { favicons[svc.id] = icon; pushState(); }
   });
   wc.setAudioMuted(S.muted.includes(svc.id) && !(win?.isVisible() && svc.id === current));
-  // web apps are wide: zoom out to fit the columns. Reapplied on every navigation, Chromium resets it
+  // reapplied on every navigation: Chromium resets the zoom
   for (const ev of ['dom-ready', 'did-finish-load', 'did-navigate', 'did-navigate-in-page']) wc.on(ev, () => wc.setZoomFactor(zoomOf(svc.id)));
   if (new URL(svc.url).hostname === 'web.whatsapp.com') waWc = wc;
   wc.loadURL(svc.url);
@@ -357,32 +354,34 @@ function addService(svc) {
 
 ipcMain.on('select', (_e, id) => views[id] && select(id));
 ipcMain.on('gear', toggleSettings);
-// the bar's +: Settings, scrolled to the "add a service" card
+ipcMain.on('toggle-server', (e) => e.sender === bar.webContents && updateSettings({ serverOpen: !S.serverOpen }));
+// the bar's +: Settings, at the add card
 ipcMain.on('add-tab', (e) => {
   if (e.sender !== bar.webContents) return;
   if (!settingsOpen) toggleSettings();
   settingsView.webContents.send('focus-add');
 });
-// the bar only knows the visible tabs: hidden ones keep their slots, the visible slots take the new order
-ipcMain.on('reorder', (e, ids) => {
+// hidden tabs keep their slots, the visible slots take the new order
+ipcMain.on('reorder', (e, ids, srvIds) => {
   if (e.sender !== bar.webContents || !Array.isArray(ids)) return;
   const vis = visible().map((s) => s.id);
   if (ids.length !== vis.length || !ids.every((id) => vis.includes(id))) return;
   let k = 0;
-  updateSettings({ order: services.map((s) => (vis.includes(s.id) ? ids[k++] : s.id)) });
+  // the capsule a tab was dropped in decides its group; only a choice that differs from the automatic one is kept
+  const server = { ...S.server };
+  if (Array.isArray(srvIds)) for (const s of visible()) { const want = srvIds.includes(s.id); if (want === autoServer(s)) delete server[s.id]; else server[s.id] = want; }
+  updateSettings({ order: services.map((s) => (vis.includes(s.id) ? ids[k++] : s.id)), server });
 });
-// the stack leaves as real files, so any target takes it: a chat, Mail, Finder
 ipcMain.on('park-drag', (e) => parked.length && e.sender === bar.webContents && e.sender.startDrag({ file: parked[0].path, files: parked.map((f) => f.path), icon: parkedIcon }));
 ipcMain.on('park-files', (e, paths) => e.sender === bar.webContents && parkFiles(paths.filter((f) => typeof f === 'string' && f && fs.existsSync(f))));
 ipcMain.on('drag-hint', (e) => Object.values(views).some((v) => v.webContents === e.sender) && bar.webContents.send('drag-hint'));
 ipcMain.on('unpark', (e) => { if (e.sender === bar.webContents) { parked = []; pushState(); } });
-// "‹ Chat" button in single-column mode: same as Esc, which closes the open chat
+// "‹ Chat" in single-column mode: Esc closes the open chat
 ipcMain.on('wa-back', (e) => {
   if (e.sender !== waWc) return;
   waWc.sendInputEvent({ type: 'keyDown', keyCode: 'Escape' });
   waWc.sendInputEvent({ type: 'keyUp', keyCode: 'Escape' });
 });
-// right click on a tab: hide / mute / reload
 ipcMain.on('tab-menu', (e, id) => {
   if (e.sender !== bar.webContents || !views[id]) return;
   const muted = S.muted.includes(id);
@@ -408,15 +407,14 @@ async function checkUpdate() {
     const rel = r.ok && (await r.json());
     const v = String(rel.tag_name || '').replace(/^v/, '');
     if (!/^\d+\.\d+\.\d+$/.test(v) || !newer(v, app.getVersion()) || latest === v) return;
-    // a file and its sha256 as GitHub reports them; without a digest we only point to the release page
+    // without a sha256 digest from GitHub, only the release page is offered
     const ok = (x) => x && /^sha256:[0-9a-f]{64}$/.test(x.digest || '') && TRUSTED.test(x.browser_download_url);
     const pick = (x, kind) => ({ url: x.browser_download_url, sha256: x.digest.slice(7), name: x.name, kind });
-    // same Electron as ours: the bundle minus Electron (~300 KB) instead of the whole dmg (~130 MB)
+    // same Electron: the app without Electron (~300 KB) instead of the dmg (~130 MB)
     const find = (n) => (rel.assets || []).find((x) => x.name === n), E = process.versions.electron;
     const signed = find(`Onebox-signed-${v}-electron${E}.zip`), zip = find(`Onebox-app-${v}-electron${E}.zip`);
     const dmg = (rel.assets || []).find((x) => /-arm64\.dmg$/.test(x.name));
-    // signed parts keep a certificate-signed app's identity (macOS keeps its permissions);
-    // an ad-hoc app takes the dmg once to get that identity
+    // a certificate-signed app keeps its identity (and macOS permissions); an ad-hoc one takes the dmg once
     asset = ok(signed) && (await certSigned()) ? pick(signed, 'signed') : ok(zip) && !ok(signed) ? pick(zip, 'app') : ok(dmg) ? pick(dmg, 'dmg') : null;
     latest = v;
     pushState();
@@ -457,10 +455,10 @@ function installUpdate() {
   const swap = 'codesign --verify --deep --strict "$3.new" && rm -rf "$3" && mv "$3.new" "$3" || rm -rf "$3.new"; ';
   const script = 'while kill -0 "$1" 2>/dev/null; do sleep 0.3; done; '
     + (upd.kind === 'signed'
-      // the signed parts over a copy; should they not match this Electron, fall back to ad-hoc rather than fail
+      // signed parts over a copy; if they don't verify, re-sign ad-hoc rather than fail
       ? 'ditto "$3" "$3.new" && rm -rf "$3.new/Contents/Resources/app" && ditto -x -k "$2" "$3.new" && { codesign --verify --deep --strict "$3.new" 2>/dev/null || codesign --force --deep --sign - "$3.new"; } && ' + swap
       : upd.kind === 'app'
-      // new code into a copy of this app, then re-sign: editing the bundle breaks the signature
+      // editing the bundle breaks the signature: re-sign
       ? 'ditto "$3" "$3.new" && rm -rf "$3.new/Contents/Resources/app" && ditto -x -k "$2" "$3.new/Contents/Resources" && codesign --force --deep --sign - "$3.new" && ' + swap
       : 'M=$(mktemp -d); if hdiutil attach -nobrowse -readonly -mountpoint "$M" "$2" >/dev/null; then ditto "$M/Onebox.app" "$3.new" && ' + swap + 'hdiutil detach "$M" -quiet; fi; ')
     + 'rm -f "$2"; open "$3"';
@@ -470,7 +468,6 @@ function installUpdate() {
 ipcMain.on('settings:update', (e) => fromFile(e) && downloadUpdate());
 ipcMain.on('settings:release', (e) => fromFile(e) && shell.openExternal(RELEASES));
 ipcMain.on('settings:install', (e) => fromFile(e) && installUpdate());
-// built-in services keep their address; self-hosted and added ones show it, editable
 const builtIn = (id) => DEFAULTS.some((d) => d.id === id);
 const homeOf = (id) => HOMELAB.find((h) => h.id === id);
 const settingsPayload = () => ({ settings: S, t: T(), services: services.map(({ id, name, url, allow = [], deny = [] }) => ({
@@ -484,7 +481,7 @@ ipcMain.handle('settings:set', (e, patch) => {
 });
 ipcMain.on('settings:quit', (e) => fromFile(e) && app.quit());
 
-// Services edited from Settings: address, filters, add, remove. Written back to services.json.
+// Service edits from Settings, written back to services.json
 const okUrl = (u) => { try { return ['http:', 'https:'].includes(new URL(u).protocol); } catch { return false; } };
 const okList = (l) => Array.isArray(l) && l.length <= 50 && l.every((x) => typeof x === 'string' && x.length <= 200);
 function dropView(id) {
@@ -499,7 +496,7 @@ const EDIT = {
     if (!okUrl(url)) return;
     svc.url = url;
     if (views[svc.id]) views[svc.id].webContents.loadURL(url); else { addService(svc); layout(); }
-    S.hidden = S.hidden.filter((x) => x !== svc.id); // giving an address means "show it"
+    S.hidden = S.hidden.filter((x) => x !== svc.id); // an address means "show it"
   },
   filters(svc, allow, deny) { if (okList(allow) && okList(deny)) Object.assign(svc, { allow, deny }); },
   remove(svc) {
@@ -524,8 +521,8 @@ ipcMain.handle('services:edit', (e, op, id, ...args) => {
     }
   } else if (svc && EDIT[op]) EDIT[op](svc, ...args);
   saveServices();
-  if (!views[current]) current = visible()[0].id; // the open tab was removed: the next one shows when Settings closes
-  updateSettings({}); // writes settings (hidden may have changed) and refreshes bar, menu and tabs
+  if (!views[current]) current = visible()[0].id;
+  updateSettings({});
   return settingsPayload();
 });
 
@@ -563,8 +560,8 @@ const HALO = `<style>
   @keyframes bob { 50% { transform: translateY(-3px); } }
 </style><div class="p"><span class="a">↑</span>{0}</div>`;
 
-// Space while a file hovers the icon opens the panel, like spring-loaded folders in Finder.
-// Space is taken globally only for that moment, and handed back on leave, drop or end.
+// Space while a file hovers the icon opens the panel, like spring-loaded folders.
+// The shortcut is held only for that moment.
 const springOn = () => !globalShortcut.isRegistered('Space') && globalShortcut.register('Space', () => { springOff(); hideHalo(false); showPanel(); });
 const springOff = () => globalShortcut.isRegistered('Space') && globalShortcut.unregister('Space');
 
@@ -596,7 +593,6 @@ function hideHalo(absorb) {
 }
 
 async function parkFiles(files) {
-  // startDrag needs the icon ready, so it is made here
   for (const file of files) {
     if (parked.some((f) => f.path === file)) continue;
     // Quick Look thumbnail (a PDF's first page, the photo), else the Finder icon
@@ -610,7 +606,6 @@ async function parkFiles(files) {
   showPanel();
 }
 
-// The panel drops below the menu bar icon
 function showPanel() {
   const t = tray.getBounds();
   const [w, h] = win.getSize();
@@ -652,10 +647,9 @@ app.whenReady().then(() => {
     { label: T().quitMenu, click: () => app.quit() },
   ])));
 
-  // BaseWindow, not BrowserWindow: a BrowserWindow keeps a blank page of its own under the views, and on every
-  // mouse move that page set the arrow cursor, then the view on top put the hand back (the cursor flickered)
+  // BaseWindow: a BrowserWindow's own blank page under the views made the cursor flicker
   win = new BaseWindow({ width: S.width, height: 780, show: false, frame: false, resizable: true, fullscreenable: false, skipTaskbar: true, alwaysOnTop: true, transparent: true, backgroundColor: '#00000000', hasShadow: true });
-  win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true }); // once, at creation: follows you to whatever Space you open it from. Toggling this on/off around every show() corrupted the window's buffer (v0.3.10 regression)
+  win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true }); // once: toggling it around show() corrupts the window
   win.on('blur', () => S.closeOnBlur && hideUnlessDrop()); // click outside closes it
   bar = new WebContentsView({ webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, sandbox: true } });
   bar.webContents.loadFile(path.join(__dirname, 'tabs.html'));
@@ -671,7 +665,7 @@ app.whenReady().then(() => {
   win.on('resized', () => { S.width = win.getSize()[0]; fs.writeFileSync(setFile(), JSON.stringify(S, null, 2)); }); // remember a dragged width
   layout();
   applySettings();
-  playTray(START_FRAMES, 140); // build-up animation at launch
+  playTray(START_FRAMES, 140);
   checkUpdate();
   setInterval(checkUpdate, 24 * 3600 * 1000);
   bar.webContents.once('did-finish-load', () => { select(asked(process.argv) ?? visible()[0].id); showPanel(); if (wanted(process.argv)) openLink(wanted(process.argv)); if (process.argv.includes('--settings')) toggleSettings(); });

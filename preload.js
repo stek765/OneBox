@@ -7,6 +7,7 @@ if (location.protocol === 'file:') {
     select: (id) => ipcRenderer.send('select', id),
     gear: () => ipcRenderer.send('gear'),
     add: () => ipcRenderer.send('add-tab'),
+    toggleServer: () => ipcRenderer.send('toggle-server'),
     menu: (id) => ipcRenderer.send('tab-menu', id),
     reorder: (ids) => ipcRenderer.send('reorder', ids),
     dragParked: () => ipcRenderer.send('park-drag'),
@@ -34,7 +35,7 @@ if (location.protocol === 'file:') {
     hinted = Date.now();
     ipcRenderer.send('drag-hint');
   }, true);
-  // service page: web notifications are routed through here so they can be filtered
+  // service page: web notifications go through Onebox's filters
   contextBridge.exposeInMainWorld('__inbox', {
     back: () => ipcRenderer.send('wa-back'),
     notify: (title, body) => ipcRenderer.send('notify', String(title).slice(0, 200), String(body).slice(0, 300)),
@@ -56,13 +57,13 @@ if (location.protocol === 'file:') {
     }
     if (window.ServiceWorkerRegistration)
       ServiceWorkerRegistration.prototype.showNotification = (t, o) => { send(t, o); return Promise.resolve(); };
-    // the app-icon badge (Telegram's unread count; its title carries none)
+    // Telegram's unread count comes as an app badge, not in the title
     if (navigator.setAppBadge) {
       const badge = (n) => { window.__inbox.badge(n); return Promise.resolve(); };
       Object.defineProperty(navigator, 'setAppBadge', { value: badge, configurable: true });
       Object.defineProperty(navigator, 'clearAppBadge', { value: () => badge(0), configurable: true });
     }
-    // Telegram hands new-message notifications to its service worker, which this script can't reach
+    // Telegram hands notifications to its service worker, out of this script's reach
     if (window.ServiceWorker) {
       const post = ServiceWorker.prototype.postMessage;
       ServiceWorker.prototype.postMessage = function (m, ...a) {
@@ -108,7 +109,42 @@ if (location.protocol === 'file:') {
         }
       };
       new MutationObserver(() => { if (!queued) { queued = true; requestAnimationFrame(sync); } }).observe(document, { childList: true, subtree: true });
+      // Esc closes an open emoji panel. WhatsApp does it only while the focus is inside the panel;
+      // from the message box its Esc closes the whole chat, so there the panel's own button is pressed first.
+      addEventListener('keydown', (e) => {
+        const panel = document.querySelector('#expressions-panel-container [role=application]');
+        if (e.key !== 'Escape' || !panel || panel.contains(document.activeElement)) return;
+        const btn = document.querySelector('#main footer button[data-tab="10"]:not([aria-haspopup])');
+        if (!btn) return;
+        e.preventDefault(); e.stopImmediatePropagation();
+        btn.click();
+      }, true);
       sync();
     })()`);
+  }
+  if (location.hostname === 'app.element.io') {
+    // Element's dark theme in Onebox's night blue, with a light chat. Panels are recoloured through
+    // Element's canvas token, the chat by tagging it .cpd-theme-light (its header dark again).
+    const d = '.cpd-theme-dark ';
+    const css = d + '.mx_RoomView.cpd-theme-light{--cpd-color-bg-canvas-default:#d3e0f0;'
+      + 'background:linear-gradient(160deg,#dde8f6 0%,#cfdcef 55%,#c3d2ea 100%)!important;color:var(--cpd-color-text-primary)}'
+      + '.mx_RoomHeader.cpd-theme-dark{color:var(--cpd-color-text-primary)}'
+      + d + '.mx_RoomView_body,' + d + '.mx_RoomView_messagePanel,' + d + '.mx_RoomView_MessageList{background:transparent!important}'
+      + 'body.cpd-theme-dark,.cpd-theme-dark #matrixchat{background:#191b2a!important}'
+      + d + '.mx_SpacePanel{--cpd-color-bg-canvas-default:#151724;background:#151724!important}'
+      + d + '.mx_RoomListPanel{--cpd-color-bg-canvas-default:#191b2a;background:#191b2a!important}'
+      + d + '.mx_RoomHeader{--cpd-color-bg-canvas-default:#1f2233;background:#1f2233!important}';
+    window.addEventListener('DOMContentLoaded', () => {
+      const st = document.createElement('style'); st.textContent = css; document.head.append(st);
+      // React rebuilds these on every room switch
+      const tag = () => {
+        if (!document.body.classList.contains('cpd-theme-dark')) return;
+        for (const e of document.querySelectorAll('.mx_RoomView:not(.cpd-theme-light)')) e.classList.add('cpd-theme-light');
+        for (const e of document.querySelectorAll('.mx_RoomHeader:not(.cpd-theme-dark)')) e.classList.add('cpd-theme-dark');
+      };
+      let queued = false;
+      new MutationObserver(() => { if (!queued) { queued = true; requestAnimationFrame(() => { queued = false; tag(); }); } }).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
+      tag();
+    });
   }
 }

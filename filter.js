@@ -1,5 +1,5 @@
 // allow: if not empty, only matches pass. deny: matches are dropped.
-// A broken regex never matches (better one notification too many than one lost).
+// A broken regex never matches: one notification too many beats one lost.
 const hit = (list, s) => list.some((r) => { try { return new RegExp(r, 'i').test(s); } catch { return false; } });
 
 exports.passes = (svc, title, body) => {

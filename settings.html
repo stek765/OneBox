@@ -11,17 +11,14 @@
   header .quit { margin-left: auto; display: flex; align-items: center; gap: 6px; }
   header .quit:hover { color: #ff6369; border-color: #ff6369; }
   h3 { margin: 24px 0 8px; padding: 8px 12px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; border-left: 3px solid #ff9a52; border-radius: 0 7px 7px 0; background: rgba(255, 154, 82, .14); }
-  /* each section is one card: the rows inside it read as a group, not as one long list */
   .card { border-radius: 12px; background: color-mix(in srgb, var(--soft) 45%, transparent); padding: 0 14px; }
   .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; padding: 6px 0; box-sizing: border-box; border-bottom: 1px solid var(--line); }
   .card > .row:last-child { border-bottom: 0; }
   .row > div > span[title] { cursor: help; }
-  /* a group of choices: one pill, the chosen one raised */
   .seg { display: flex; padding: 2px; gap: 2px; border-radius: 9px; background: var(--soft); }
   .seg button { border: 0; padding: 4px 11px; border-radius: 7px; opacity: .75; }
   .seg button:hover { background: transparent; opacity: 1; }
   .seg button.on { background: var(--bg); color: inherit; opacity: 1; font-weight: 600; box-shadow: 0 1px 3px rgba(20, 25, 60, .18); }
-  /* the service list's column titles, once instead of under every switch */
   .cols { display: flex; justify-content: flex-end; gap: 14px; padding: 8px 0 0; font-size: 10.5px; opacity: .55; }
   .cols { gap: 6px; }
   .cols span, .cell { width: 72px; display: flex; justify-content: center; white-space: nowrap; flex: none; }
@@ -43,7 +40,6 @@
   input[type=text] { font: inherit; color: inherit; background: transparent; border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; width: 100%; box-sizing: border-box; }
   input[type=text]:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); }
   .warn { color: #e5803a; opacity: 1; }
-  /* service rows: the app's icon, its name, the address underneath */
   .svc { display: flex; align-items: center; gap: 12px; min-width: 0; }
   .sico { width: 26px; height: 26px; flex: none; border-radius: 7px; object-fit: contain; }
   i.sico { display: grid; place-items: center; background: var(--c); color: #fff; font: 800 13px -apple-system, sans-serif; font-style: normal; }
@@ -51,7 +47,7 @@
   .row.tap:hover .svc > div > span { color: var(--accent); }
   small.todo { color: var(--accent); opacity: 1; }
   .svc small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 260px; }
-  /* popups: a card over the settings, the page dimmed behind it (a real window would close the panel on blur) */
+  /* popups live in the page: a real window would blur and close the panel */
   .veil { position: fixed; inset: 0; z-index: 9; display: grid; place-items: center; padding: 20px; background: rgba(18, 20, 32, .32); backdrop-filter: blur(5px); animation: fade .18s ease-out; }
   .pop { position: relative; width: min(460px, 100%); max-height: calc(100vh - 40px); overflow-y: auto; box-sizing: border-box; padding: 22px 22px 18px; border-radius: 16px; background: var(--bg); box-shadow: 0 24px 60px rgba(10, 12, 30, .35), 0 0 0 1px var(--line); animation: rise .26s cubic-bezier(.2, .9, .3, 1.15); }
   .pop .head { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
@@ -75,7 +71,6 @@
   .pop label { display: flex; align-items: center; gap: 8px; margin: 14px 0 6px; font-weight: 600; }
   @keyframes fade { from { opacity: 0; } }
   @keyframes rise { from { opacity: 0; transform: translateY(14px) scale(.97); } }
-  /* add a service: a card that stands out, the bar's + scrolls here */
   .addc { margin: 10px 0 4px; padding: 14px; border-radius: 12px; border: 1.5px dashed color-mix(in srgb, var(--accent) 45%, transparent); background: color-mix(in srgb, var(--accent) 6%, transparent); }
   .addc .t { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
   .addc .plus { width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; background: var(--accent); color: #fff; font-size: 17px; }
@@ -87,7 +82,6 @@
   @keyframes flash { 0%, 40% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 35%, transparent); } }
   input[type=time] { font: inherit; color: inherit; background: transparent; border: 1px solid var(--line); border-radius: 7px; padding: 3px 6px; }
   small { opacity: .6; display: block; margin-top: 2px; }
-  /* full width, flush with the bottom: the dusk colours of the README screenshots, a bit lighter */
   footer { margin: 32px -28px 0; padding: 22px 28px; text-align: center; font-weight: 600; color: #fff; background: linear-gradient(135deg, #2f3350 0%, #6b4a5a 50%, #e39a6a 100%); }
 </style>
 <div id="app"></div>
@@ -102,17 +96,15 @@
   const set = async (patch) => { apply(await settings.set(patch)); render(); };
   const opts = (list, cur, key) => { const d = el('div', 'seg'); for (const [v, label] of list) { const b = el('button', v === cur ? 'on' : '', label); b.onclick = () => set({ [key]: v }); d.append(b); } return d; };
   const sw = (on, fn) => { const b = el('button', `sw${on ? ' on' : ''}`); b.onclick = fn; return b; };
-  // the hint is a tooltip on the label: one line per setting, the explanation when you ask for it
   const row = (label, ctrl, hint) => { const r = el('div', 'row'); const l = el('div'), sp = el('span', '', label); if (hint) sp.title = hint; l.append(sp); r.append(l, ctrl); return r; };
   const card = (...rows) => { const c = el('div', 'card'); c.append(...rows); return c; };
 
-  // each switch sits in a fixed-width cell, the same width as its column title above
   const toggle = (caption, on, fn) => { const c = el('div', 'cell'), b = sw(on, fn); b.title = caption; c.append(b); return c; };
   const edit = async (...a) => { apply(await settings.edit(...a)); render(); };
   const input = (value, placeholder, onchange) => { const i = el('input'); i.type = 'text'; i.value = value; i.placeholder = placeholder; i.spellcheck = false; if (onchange) i.onchange = () => onchange(i.value.trim()); return i; };
-  // Bitwarden's vault encrypts with WebCrypto, which browsers give only to https pages (and localhost)
+  // Bitwarden needs WebCrypto, which browsers give only to https and localhost
   const insecure = (s) => s.home?.https && /^http:/.test(s.url) && !/^http:\/\/(localhost|127\.0\.0\.1)[:/]/.test(s.url);
-  // filters are edited as comma-separated words; each one is a case-insensitive regex, so a plain word works
+  // comma-separated words; each is a case-insensitive regex
   const words = (v) => v.split(',').map((x) => x.trim()).filter(Boolean);
   const icon = (s) => {
     if (s.icon) { const i = el('img', 'sico'); i.src = s.icon; i.onerror = () => i.replaceWith(letter(s)); return i; }
@@ -120,11 +112,9 @@
   };
   const letter = (s) => { const i = el('i', 'sico', s.name[0]); i.style.setProperty('--c', s.color); return i; };
 
-  // one popup at a time; it lives outside #app so a re-render underneath doesn't close it
-  let popId = null, popKind = null;
-  const closePop = () => { popId = popKind = null; document.getElementById('pop').replaceChildren(); };
+  // outside #app, so a re-render underneath doesn't close it
+  const closePop = () => document.getElementById('pop').replaceChildren();
   function showPop(kind, s) {
-    popKind = kind; popId = s.id;
     const card = el('div', 'pop');
     const x = el('button', 'x', '✕'); x.onclick = closePop;
     const head = el('div', 'head'), ht = el('div');
@@ -144,7 +134,6 @@
     d.append(el('code', '', text), b);
     return d;
   };
-  // ways to connect, not steps in a row: no numbers, an "or" between them
   const step = (title, text, ...extra) => {
     const d = el('div', 'step');
     d.append(el('b', '', title), el('span', '', text), ...extra);
@@ -152,7 +141,6 @@
   };
   function connectBody(s) {
     const ex = s.home?.example || 'https://…';
-    // https-only apps (Bitwarden) get the one way that works; the others, at home and away
     const out = !s.home ? [] : s.home.https
       ? [step(t.gHttps, t.gHttpsText, cmd('tailscale serve --bg 8080'), el('span', '', t.gThen), cmd(ex), el('span', '', t.gCloud))]
       : [step(t.gHome, t.gHomeText, cmd(ex)), el('div', 'or', t.or), step(t.gAway, t.gAwayText, cmd(ex.replace('192.168.1.10', '100.x.y.z')))];
@@ -162,7 +150,7 @@
     const warn = el('small', 'warn', insecure(s) ? t.needsHttps : '');
     const send = () => { const v = addr.value.trim(); if (!v) return; edit('url', s.id, v).then(() => { const n = SV.find((x) => x.id === s.id); if (insecure(n)) warn.textContent = t.needsHttps; else closePop(); }); };
     go.onclick = send;
-    addr.onkeydown = (e) => { if (e.key === 'Enter') send(); }; // an arrow returning false would swallow every key
+    addr.onkeydown = (e) => { if (e.key === 'Enter') send(); };
     foot.append(addr, go);
     return [...out, foot, warn];
   }
@@ -188,12 +176,12 @@
     ctl.append(f);
     if (!s.builtIn && !s.home) { const x = el('button', 'ghost', '✕'); x.title = t.remove; x.onclick = () => edit('remove', s.id); ctl.append(x); }
     ctl.append(
-      // no address yet: the switch opens the connect popup instead
+      // no address yet: open the connect popup instead
       toggle(t.visible, !hidden, () => (s.url ? set({ hidden: hidden ? S.hidden.filter((x) => x !== s.id) : [...S.hidden, s.id] }) : showPop('connect', s))),
       toggle(t.notifications, !muted, () => set({ muted: muted ? S.muted.filter((x) => x !== s.id) : [...S.muted, s.id] })),
     );
     const r = el('div', 'row'); r.dataset.id = s.id; r.append(left, ctl);
-    // apps with an address of their own: the whole row opens the connect popup (its switches and buttons stay theirs)
+    // the row opens the connect popup; its own buttons keep their clicks
     if (!s.builtIn) { r.classList.add('tap'); r.onclick = (e) => e.target.closest('button') || showPop('connect', s); }
     return r;
   }
@@ -272,7 +260,6 @@
         row(t.quiet, quietCtl, t.quietHint),
       ),
       el('h3', '', t.secServices),
-      // one list: the cloud apps first, then your server's (the tab bar keeps the same order)
       card(cols(), ...SV.map(serviceRow)),
       addCard(),
       el('h3', '', t.secGeneral),

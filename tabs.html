@@ -1,12 +1,12 @@
 <!doctype html>
 <meta charset="utf-8">
 <style>
-  /* the bar is dark in both themes (it was chosen that way); --bar is its top, where the arrow is painted */
+  /* dark in both themes; --bar is the top, where the arrow is */
   :root { color-scheme: dark; --bar: #23232b; --bar2: #1b1b21; --text: #e8ebf7; --soft: rgba(255, 255, 255, .08); }
   html, body { margin: 0; height: 100%; background: transparent; }
   body { position: relative; font: 13px -apple-system, sans-serif; color: var(--text); user-select: none; }
   #arrow { position: absolute; top: 0; width: 22px; height: 10px; display: none; }
-  /* below the bar the same dark goes on to the bottom: the frame around the page */
+  /* the frame around the page */
   #frame { position: absolute; top: 69px; left: 0; right: 0; bottom: 0; background: var(--bar2); border-radius: 0 0 12px 12px; }
   #arrow path { fill: var(--bar); }
   #shape { position: absolute; top: 10px; left: 0; right: 0; height: 60px; box-sizing: border-box; padding: 2px 10px 14px; display: flex; align-items: center; gap: 6px; background: linear-gradient(to bottom, var(--bar), var(--bar2) 80%); border-radius: 12px 12px 0 0; }
@@ -40,14 +40,14 @@
   @keyframes pop { from { transform: scale(.5); opacity: 0; } }
   .gear { margin-left: auto; font-size: 20px; line-height: 1; padding: 4px 8px 6px; color: color-mix(in srgb, var(--text) 60%, transparent); }
   .gear:hover, .gear.on { color: var(--text); }
-  /* the tabs scroll sideways once they outgrow the bar; two arrows appear and say which way more is hidden */
-  #tabs { display: flex; gap: 6px; min-width: 0; flex: 0 1 auto; overflow-x: auto; scrollbar-width: none; padding: 3px 2px; }
-  /* like Arc: only the site's icon; the open tab widens to show its name, tinted with its app's colour */
+  /* tabs scroll sideways once they outgrow the bar */
+  #tabs { display: flex; align-items: center; gap: 6px; min-width: 0; flex: 0 1 auto; overflow-x: auto; scrollbar-width: none; padding: 3px 2px; }
+  /* icons only; the open tab widens to show its name */
   #tabs button { position: relative; flex: none; display: flex; align-items: center; gap: 0; height: 34px; padding: 0 9px; border-radius: 10px; font-weight: 600; transition: background .3s, gap .3s; }
   #tabs button:hover { background: rgba(255, 255, 255, .06); }
   #tabs .tile { display: grid; place-items: center; width: 18px; height: 18px; flex: none; }
   #tabs .tile img { width: 18px; height: 18px; border-radius: 4px; object-fit: contain; pointer-events: none; }
-  /* Vaultwarden's logo is black: on the dark bar it sits on a white disc, as on its own site */
+  /* Vaultwarden's black logo on a white disc */
   #tabs .tile img[src$="vaultwarden.svg"] { background: #fff; border-radius: 50%; }
   #tabs .tile i { width: 18px; height: 18px; border-radius: 4px; background: var(--c); color: #fff; font: 800 11px/18px -apple-system, sans-serif; text-align: center; font-style: normal; }
   #tabs .nm { max-width: 0; opacity: 0; overflow: hidden; white-space: nowrap; transition: max-width .45s cubic-bezier(.2, .8, .2, 1), opacity .3s; }
@@ -56,13 +56,22 @@
   #tabs b { position: absolute; top: 1px; left: 19px; margin: 0; transform: scale(.85); }
   #tabs button.on b { position: static; margin-left: 0; transform: none; }
   #tabs::-webkit-scrollbar { display: none; }
-  /* your own server's apps, apart from the cloud ones: a thin divider before the first of them */
-  /* your server's apps start after a small server glyph (Lucide "server", ISC) */
-  #tabs button.srv1 { margin-left: 24px; }
-  #tabs button.srv1::before { content: ''; position: absolute; left: -22px; top: 50%; width: 14px; height: 14px; margin-top: -7px; opacity: .5; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='20' height='8' x='2' y='2' rx='2' ry='2'/%3E%3Crect width='20' height='8' x='2' y='14' rx='2' ry='2'/%3E%3Cline x1='6' x2='6.01' y1='6' y2='6'/%3E%3Cline x1='6' x2='6.01' y1='18' y2='18'/%3E%3C/svg%3E") center / contain no-repeat; }
-  /* add a service: a small dashed square right after the tabs */
-  #add { flex: none; width: 28px; height: 28px; padding: 0; margin-left: 2px; border-radius: 9px; border: 1.5px dashed rgba(255, 255, 255, .22); color: rgba(255, 255, 255, .55); font: 300 19px/1 -apple-system, sans-serif; }
-  #add:hover { color: var(--text); border-color: rgba(255, 255, 255, .45); background: var(--soft); }
+  /* the user's server apps come after a divider; clicking it folds them into a small stack */
+  .cap { flex: none; display: flex; align-items: center; gap: 6px; }
+  /* a thin line, then SERVER written upwards beside it */
+  .sep { flex: none; display: flex; align-items: center; gap: 7px; height: 34px; margin: 0 6px 0 8px; cursor: pointer; }
+  .sep::before { content: ''; width: 1.5px; height: 20px; border-radius: 1px; background: rgba(255, 255, 255, .2); }
+  .sep span { writing-mode: vertical-rl; transform: rotate(180deg); font: 700 6.5px/1 -apple-system, sans-serif; letter-spacing: .1em; color: rgba(255, 255, 255, .38); }
+  .stack { display: flex; align-items: center; height: 34px; padding: 0 8px; border-radius: 10px; cursor: pointer; }
+  .stack:hover { background: rgba(255, 255, 255, .06); }
+  .stack img { width: 18px; height: 18px; border-radius: 50%; object-fit: contain; margin-left: -7px; box-shadow: 0 0 0 2px #23232b; background: #23232b; }
+  .stack img:first-child { margin-left: 0; }
+  .stack span { margin-left: 6px; font-size: 11px; font-weight: 700; color: rgba(255, 255, 255, .55); }
+  #add { flex: none; position: relative; width: 22px; height: 22px; padding: 0; margin-left: 4px; border-radius: 7px; border: 1.2px dashed rgba(255, 255, 255, .25); opacity: 0; transition: opacity .15s; }
+  #add::before, #add::after { content: ''; position: absolute; left: 50%; top: 50%; width: 9px; height: 1.5px; margin: -.75px 0 0 -4.5px; border-radius: 1px; background: rgba(255, 255, 255, .6); }
+  #add::after { transform: rotate(90deg); }
+  #tabs:hover ~ #add, #shape .nav:hover ~ #add, #add:hover { opacity: 1; }
+  #add:hover { border-color: rgba(255, 255, 255, .45); background: var(--soft); }
   #tail { display: contents; }
   .nav { flex: none; display: none; width: 24px; height: 24px; padding: 0; border-radius: 6px; border: 1px solid var(--soft); font-size: 15px; line-height: 1; }
   #shape.overflow .nav { display: block; }
@@ -75,11 +84,11 @@
 </style>
 <svg id="arrow" viewBox="0 0 22 10"><path d="M0 10 L9 2 Q11 0 13 2 L22 10 Z"/></svg>
 <div id="frame"></div>
-<div id="shape"><button class="nav" id="prev">‹</button><div id="tabs"></div><button class="nav" id="next">›</button><button id="add">+</button><div id="tail"></div></div>
+<div id="shape"><button class="nav" id="prev">‹</button><div id="tabs"></div><button class="nav" id="next">›</button><button id="add"></button><div id="tail"></div></div>
 <script>
   let lastParked = null, selfDrag = false, hintTimer;
   const shape = document.getElementById('shape');
-  // dragging state, kept on #shape so the state pushes that rebuild the bar don't reset it
+  // kept on #shape so state pushes that rebuild the bar don't reset it
   const dragging = (over) => {
     if (selfDrag) return;
     shape.classList.add('dragging');
@@ -96,9 +105,7 @@
   const GAP = 6, EDGE = 28;
   let drag = null, pending = null, justDragged = false, shownCurrent;
 
-  // fade only the side that hides tabs
   const prev = document.getElementById('prev'), next = document.getElementById('next');
-  // arrows only while the tabs overflow; each one greys out once its side has nothing left
   const edges = () => {
     shape.classList.toggle('overflow', strip.scrollWidth > strip.clientWidth + 1);
     prev.disabled = strip.scrollLeft <= 1;
@@ -108,18 +115,19 @@
   next.onclick = () => strip.scrollBy({ left: strip.clientWidth * .7, behavior: 'smooth' });
   strip.addEventListener('scroll', edges);
   new ResizeObserver(edges).observe(strip);
-  // a mouse wheel scrolls vertically: turn it sideways (a trackpad swipe already is)
+  // a mouse wheel scrolls sideways
   strip.addEventListener('wheel', (e) => {
     if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
     e.preventDefault();
     strip.scrollLeft += e.deltaY;
   }, { passive: false });
 
-  // Drag to reorder: the tab follows the pointer, the others slide aside to open its slot.
-  // Pointer events, not HTML5 drag: that one draws a ghost image and is the file-drop path here.
+  const tabButtons = () => [...strip.querySelectorAll('button[data-id]')];
+  const mid = (x) => { const r = x.getBoundingClientRect(); return r.left - strip.getBoundingClientRect().left + strip.scrollLeft + r.width / 2; };
+  // Drag to reorder with pointer events: HTML5 drag is the file-drop path here.
   function press(e) {
     if (e.button !== 0) return;
-    const b = e.currentTarget, btns = [...strip.children], x0 = e.clientX, s0 = strip.scrollLeft;
+    const b = e.currentTarget, btns = tabButtons(), x0 = e.clientX, s0 = strip.scrollLeft;
     let d = null, last = e, speed = 0;
     const place = () => {
       const dx = last.clientX - x0 + strip.scrollLeft - s0, mid = d.mids[d.i] + dx;
@@ -134,7 +142,7 @@
         x.style.transform = shift ? `translateX(${shift}px)` : '';
       });
     };
-    // near an edge the strip scrolls on its own, so a tab can travel past what is on screen
+    // auto-scroll near the edges
     const roll = () => {
       if (!d || d.done) return;
       if (speed) { strip.scrollLeft += speed; place(); }
@@ -144,7 +152,7 @@
       last = ev;
       if (!d) {
         if (Math.abs(ev.clientX - x0) < 5) return; // still a click
-        d = drag = { i: btns.indexOf(b), to: btns.indexOf(b), w: b.offsetWidth + GAP, mids: btns.map((x) => x.offsetLeft + x.offsetWidth / 2) };
+        d = drag = { i: btns.indexOf(b), to: btns.indexOf(b), w: b.offsetWidth + GAP, mids: btns.map(mid) };
         b.classList.add('lift');
         strip.classList.add('sorting');
         requestAnimationFrame(roll);
@@ -161,22 +169,22 @@
       d.done = true;
       justDragged = true; // the click that follows the release must not select the tab
       setTimeout(() => { justDragged = false; });
-      // glide into the slot, then commit
       const span = (a, z) => btns.slice(a, z).reduce((n, x) => n + x.offsetWidth + GAP, 0);
       const final = d.to > d.i ? span(d.i + 1, d.to + 1) : -span(d.to, d.i);
       b.style.transition = 'transform .18s cubic-bezier(.2, .8, .2, 1)';
       b.style.transform = `translateX(${final}px)`;
       setTimeout(() => {
         const moved = d.to !== d.i;
-        if (moved) strip.insertBefore(b, d.to > d.i ? btns[d.to].nextSibling : btns[d.to]);
+        // dropped next to a server tab = into the capsule, and the other way round
+        if (moved) btns[d.to].parentNode.insertBefore(b, d.to > d.i ? btns[d.to].nextSibling : btns[d.to]);
         for (const x of btns) { x.style.transition = 'none'; x.style.transform = ''; }
         b.classList.remove('lift');
         strip.classList.remove('sorting');
         void strip.offsetWidth; // apply the reset before the transitions come back
         for (const x of btns) x.style.transition = '';
         drag = null;
-        // the push that answers the reorder carries the new order: an older one would flash the old order
-        if (moved) { pending = null; tabs.reorder([...strip.children].map((x) => x.dataset.id)); } else if (pending) { render(pending); pending = null; }
+        // a pending older state would flash the old order
+        if (moved) { pending = null; tabs.reorder(tabButtons().map((x) => x.dataset.id), [...strip.querySelectorAll('.cap button[data-id]')].map((x) => x.dataset.id)); } else if (pending) { render(pending); pending = null; }
       }, 180);
     };
     addEventListener('pointermove', move);
@@ -184,20 +192,20 @@
     addEventListener('pointercancel', up);
   }
 
-  // unread counts keep arriving while a tab is held: rebuilding the strip then would drop it, so wait
+  // don't rebuild the strip while a tab is held
   tabs.onState((st) => { if (drag) pending = st; else render(st); });
   document.getElementById('add').onclick = () => tabs.add();
-  function render({ list, current, settingsOpen, arrowX, gearTitle, addTitle, dropSlot, parked }) {
+  function render({ list, current, settingsOpen, arrowX, gearTitle, addTitle, serverOpen, serverFold, serverOpenTip, dropSlot, parked }) {
     document.getElementById('add').title = addTitle;
     const arrow = document.getElementById('arrow');
     arrow.style.display = arrowX == null ? 'none' : 'block';
     if (arrowX != null) arrow.style.left = `${arrowX - 11}px`;
     const x = strip.scrollLeft;
-    strip.replaceChildren(...list.map((s, i) => {
+    const make = (s) => {
       const b = document.createElement('button');
       const tile = Object.assign(document.createElement('span'), { className: 'tile' });
       const letter = () => tile.replaceChildren(Object.assign(document.createElement('i'), { textContent: s.name[0] }));
-      // until the page says its icon (or if it fails to load): the initial on the app's colour
+      // the initial until the icon loads
       if (s.icon) tile.append(Object.assign(document.createElement('img'), { src: s.icon, onerror: letter, draggable: false }));
       else letter();
       b.append(tile, Object.assign(document.createElement('span'), { className: 'nm', textContent: s.name }));
@@ -205,26 +213,43 @@
       b.dataset.id = s.id;
       b.style.setProperty('--c', s.color);
       if (s.id === current && !settingsOpen) b.classList.add('on');
-      if (s.server && i > 0 && !list[i - 1].server) b.classList.add('srv1');
       if (s.unread) { const n = document.createElement('b'); n.textContent = s.unread > 99 ? '99+' : s.unread; b.append(n); }
       b.onpointerdown = press;
       b.onclick = () => { if (!justDragged) tabs.select(s.id); };
       b.oncontextmenu = (e) => { e.preventDefault(); tabs.menu(s.id); };
       return b;
-    }));
+    };
+    const srv = list.filter((s) => s.server);
+    const parts = list.filter((s) => !s.server).map(make);
+    if (srv.length) {
+      // folded, unless the open tab lives inside
+      const open = serverOpen || (!settingsOpen && srv.some((s) => s.id === current));
+      const cap = Object.assign(document.createElement('div'), { className: 'cap' });
+      const sep = Object.assign(document.createElement('div'), { className: 'sep', title: open ? serverFold : serverOpenTip, onclick: () => tabs.toggleServer() });
+      sep.append(Object.assign(document.createElement('span'), { textContent: 'SERVER' }));
+      cap.append(sep);
+      if (open) cap.append(...srv.map(make));
+      else {
+        const st = Object.assign(document.createElement('div'), { className: 'stack', title: serverOpenTip, onclick: () => tabs.toggleServer() });
+        for (const s of srv.slice(0, 3)) if (s.icon) st.append(Object.assign(document.createElement('img'), { src: s.icon, draggable: false }));
+        if (srv.length > 3) st.append(Object.assign(document.createElement('span'), { textContent: `+${srv.length - 3}` }));
+        cap.append(st);
+      }
+      parts.push(cap);
+    }
+    strip.replaceChildren(...parts);
     strip.scrollLeft = x; // emptied and refilled, the strip would jump back to the start
     // a tab opened from the menu or a shortcut may sit off screen
     if (current !== shownCurrent) { shownCurrent = current; strip.querySelector('.on')?.scrollIntoView({ inline: 'nearest', block: 'nearest', behavior: 'smooth' }); }
     edges();
     tail.replaceChildren(...(parked ? [(() => {
       const p = document.createElement('div');
-      // the chip is rebuilt on every state push: animate only a newly parked file
+      // animate only a newly parked file
       p.className = parked.at === lastParked ? 'park' : 'park new';
       lastParked = parked.at;
       p.draggable = true;
       p.ondragstart = (e) => { e.preventDefault(); selfDrag = true; tabs.dragParked(); };
       p.title = parked.tip;
-      // up to three sheets fanned out, the newest on top
       p.style.paddingLeft = `${28 + 6 * parked.thumbs.length}px`;
       const imgs = parked.thumbs.map((src, i, a) => {
         const img = document.createElement('img');
